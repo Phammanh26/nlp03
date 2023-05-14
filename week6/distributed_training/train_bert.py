@@ -11,6 +11,10 @@ import torch
 from contextlib import nullcontext
 from torch.cuda.amp import GradScaler, autocast
 
+
+torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
+torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
+
 # -----------------------------------------------------------------------------
 # Load the dataset
 dataset = load_dataset("sepidmnorozy/Vietnamese_sentiment")
@@ -80,11 +84,14 @@ for epoch in range(3):
         with ctx:
             outputs = model(input_ids, attention_mask=attention_masks, labels=labels)
             loss = criterion(outputs.logits, labels)
-
-        # Scale the loss and backpropagate with the help of GradScaler
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+        if mixed_precision_dtype:
+            # Scale the loss and backpropagate with the help of GradScaler
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
         total_train_loss += loss.item()
         preds = torch.argmax(outputs.logits, dim=1)
@@ -105,8 +112,7 @@ for epoch in range(3):
         with torch.no_grad():
             with ctx:
                 outputs = model(input_ids, attention_mask=attention_masks, labels=labels)
-        
-        loss = criterion(outputs.logits, labels)
+                loss = criterion(outputs.logits, labels)
         total_eval_loss += loss.item()
         preds = torch.argmax(outputs.logits, dim=1)
         total_eval_correct += (preds == labels).sum().item()

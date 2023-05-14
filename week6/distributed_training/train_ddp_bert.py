@@ -49,10 +49,8 @@ master_process = ddp_rank == 0 # this process will do logging, checkpointing etc
 ddp_local_rank = int(os.environ['LOCAL_RANK'])
 # Set the cuda device
 device = f'cuda:{ddp_local_rank}'
-# Set the device
-# torch.cuda.set_device(device)
-
 model.to(device)
+
 ddp_model = DDP(model, device_ids=[ddp_local_rank], output_device=ddp_local_rank)
 
 # Create the DataLoaders
@@ -80,7 +78,7 @@ eval_dataloader = DataLoader(
 
 for epoch in range(3):
     # Training
-    model.train()
+    ddp_model.train()
     total_train_loss, total_train_correct = 0, 0
     if master_process:
         train_progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1} [Training]", position=0, leave=True)
@@ -98,13 +96,18 @@ for epoch in range(3):
         total_train_loss += loss.item()
         preds = torch.argmax(outputs.logits, dim=1)
         total_train_correct += (preds == labels).sum().item()
+
     avg_train_loss = total_train_loss / len(train_dataloader)
-    avg_train_accuracy = total_train_correct / len(encoded_train_dataset)
+
+    total_train_correct_tensor = torch.tensor(total_train_correct, dtype=torch.float32).to(device)
+    torch.distributed.all_reduce(total_train_correct_tensor, op=torch.distributed.ReduceOp.SUM)
+    global_total_train_correct = total_train_correct_tensor.item()
+    avg_train_accuracy = global_total_train_correct / len(encoded_train_dataset)
     if master_process:
         print(f"Epoch {epoch + 1}, Train Loss: {avg_train_loss}, Train Accuracy: {avg_train_accuracy}")
 
     # Evaluation
-    model.eval()
+    ddp_model.eval()
     total_eval_loss, total_eval_correct = 0, 0
     if master_process:
         eval_progress_bar = tqdm(eval_dataloader, desc=f"Epoch {epoch + 1} [Evaluation]", position=0, leave=True)
