@@ -75,10 +75,6 @@ class Prompter(object):
 
     def get_response(self, output: str) -> str:
         return output.split(self.template["response_split"])[1].strip()
-    
-# Step 1: Initialize the model
-model_name = "gpt2"  # Pre-trained GPT-2 model
-model = AutoModelForCausalLM.from_pretrained(model_name)
 
 # Step 2: Initialize the Trainer
 training_args = TrainingArguments(
@@ -191,6 +187,28 @@ trainer = Trainer(
 # Step 3: Configure DistributedDataParallel (DDP)
 # world_size = torch.cuda.device_count()  # Number of available GPUs
 init_process_group(backend=backend)  # Initialize the process group
+
+
+model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        trust_remote_code=True,
+        load_in_8bit=True,
+        torch_dtype=torch.float16,
+        device_map={"": Accelerator().process_index},
+    )
+model = prepare_model_for_int8_training(model)
+
+lora_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM",
+)
+
+model = get_peft_model(model, lora_config)
+
+model.print_trainable_parameters()
 
 # Get the DDP rank
 ddp_rank = int(os.environ['RANK'])
