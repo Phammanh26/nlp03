@@ -25,7 +25,6 @@ from torch.utils.data.distributed import DistributedSampler
 model_path = 'bigscience/bloom-560m'
 data_path = 'alpaca_data.json'
 output_dir = 'checkpoints/'
-device = 'cuda:1'
 size_valid_set = 0.1
 max_length = 256
 num_epochs = 3
@@ -52,14 +51,13 @@ class Trainer:
             num_epochs,
             max_length,
             batch_size,
-            device):
+            ):
         
         # setup the model
         self.model = model
         # setup the optimizer
         self.optimizer = optimizer
 
-        self.device = device
         self.num_epochs = num_epochs
         self.max_length = max_length
         self.batch_size = batch_size
@@ -106,9 +104,9 @@ class Trainer:
         for epoch in range(self.num_epochs):
             model.train()
             for step, batch in enumerate(tqdm(train_loader)):
-                input_ids = batch["input_ids"].to(self.device)
-                attention_masks = batch["attention_mask"].to(self.device)
-                labels = batch["labels"].to(self.device)
+                input_ids = batch["input_ids"].to(self.gpu_id)
+                attention_masks = batch["attention_mask"].to(self.gpu_id)
+                labels = batch["labels"].to(self.gpu_id)
                 
                 outputs = model(input_ids = input_ids,  attention_mask=attention_masks, labels = labels)
                 
@@ -257,7 +255,6 @@ def main():
         num_epochs = num_epochs,
         max_length = max_length,
         batch_size = batch_size,
-        device = device
         )
     trainer.wrap_mdoel_by_ddp()
     
