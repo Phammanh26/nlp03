@@ -138,7 +138,7 @@ class Trainer:
         self.iter_dt = 0.0
 
     def run(self):
-        model, config = self.model, self.config
+        model = self.model
 
         # setup the dataloader
         # Create the DataLoaders
@@ -168,7 +168,7 @@ class Trainer:
             # backprop and update the parameters
             model.zero_grad(set_to_none=True)
             self.loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
             self.optimizer.step()
 
             self.iter_num += 1
@@ -177,7 +177,7 @@ class Trainer:
             self.iter_time = tnow
 
             # termination conditions
-            if config.max_iters is not None and self.iter_num >= config.max_iters:
+            if self.iter_num >= 1000:
                 break
 
 
