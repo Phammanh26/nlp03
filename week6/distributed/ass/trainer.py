@@ -183,67 +183,68 @@ class Trainer:
                 break
 
 
+if __name__ == '__main__':
 
-import gdown
-url_data_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
-gdown.download(url_data_path, data_path, quiet=False, fuzzy=True)
+    import gdown
+    url_data_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
+    gdown.download(url_data_path, data_path, quiet=False, fuzzy=True)
 
-model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        trust_remote_code=True,
-        load_in_8bit=True,
-        torch_dtype=torch.float16,
-        device_map={"": Accelerator().process_index},
-    )
-model = prepare_model_for_int8_training(model)
+    model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            load_in_8bit=True,
+            torch_dtype=torch.float16,
+            device_map={"": Accelerator().process_index},
+        )
+    model = prepare_model_for_int8_training(model)
 
-lora_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
-    lora_dropout=0.05,
-    bias="none",
-    task_type="CAUSAL_LM",
-)
-
-model = get_peft_model(model, lora_config)
-
-model.print_trainable_parameters()
-
-
-optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
-
-
-
-print('Start config')
-config = AutoConfig.from_pretrained(model_path)
-architecture = config.architectures[0]
-print('Start tokenizer')
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-print('End tokenizer')
-
-if "Llama" in architecture:
-    print("Setting EOS, BOS, UNK, and PAD tokens for LLama tokenizer")
-    tokenizer.add_special_tokens(
-        {
-            "eos_token": "</s>",
-            "bos_token": "</s>",
-            "unk_token": "</s>",
-        }
-    )
-    tokenizer.pad_token_id = (
-        0  # unk. we want this to be different from the eos token
+    lora_config = LoraConfig(
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
     )
 
-    train_dataset, eval_dataset = create_datasets(tokenizer)
+    model = get_peft_model(model, lora_config)
 
-trainer = Trainer(
-        model=model,
-        optimizer=optimizer,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        data_collator=DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True),
-        batch_size = micro_batch_size
+    model.print_trainable_parameters()
+
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
+
+
+
+    print('Start config')
+    config = AutoConfig.from_pretrained(model_path)
+    architecture = config.architectures[0]
+    print('Start tokenizer')
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    print('End tokenizer')
+
+    if "Llama" in architecture:
+        print("Setting EOS, BOS, UNK, and PAD tokens for LLama tokenizer")
+        tokenizer.add_special_tokens(
+            {
+                "eos_token": "</s>",
+                "bos_token": "</s>",
+                "unk_token": "</s>",
+            }
+        )
+        tokenizer.pad_token_id = (
+            0  # unk. we want this to be different from the eos token
         )
 
-trainer.run()
-        
+
+    train_dataset, eval_dataset = create_datasets(tokenizer)
+    trainer = Trainer(
+            model=model,
+            optimizer=optimizer,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            data_collator=DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True),
+            batch_size = micro_batch_size
+            )
+
+    trainer.run()
+            
