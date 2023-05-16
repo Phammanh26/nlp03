@@ -40,6 +40,9 @@ import gdown
 url_data_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
 gdown.download(url_data_path, data_path, quiet=False, fuzzy=True)
 
+
+backend = "nccl"
+
 class Prompter(object):
     __slots__ = ("template")
 
@@ -186,8 +189,8 @@ trainer = Trainer(
 
 
 # Step 3: Configure DistributedDataParallel (DDP)
-world_size = torch.cuda.device_count()  # Number of available GPUs
-init_process_group(backend="nccl")  # Initialize the process group
+# world_size = torch.cuda.device_count()  # Number of available GPUs
+init_process_group(backend=backend)  # Initialize the process group
 
 # Get the DDP rank
 ddp_rank = int(os.environ['RANK'])
@@ -198,7 +201,9 @@ ddp_local_rank = int(os.environ['LOCAL_RANK'])
 device = f'cuda:{ddp_local_rank}'
 model.to(device)
 
+
 model = DistributedDataParallel(model)
+
 
 # Step 4: Train the model using Trainer
 trainer.train()
@@ -207,4 +212,4 @@ trainer.train()
 trainer.save_model("./trained_model")
 
 
-destroy_process_group()
+# destroy_process_group()
