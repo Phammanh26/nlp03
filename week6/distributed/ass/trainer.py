@@ -61,11 +61,12 @@ class Trainer:
         self.num_epochs = num_epochs
         self.max_length = max_length
         self.batch_size = batch_size
-        self.gpu_id = None
-
-    def wrap_mdoel_by_ddp(self):
         self.gpu_id = int(os.environ["LOCAL_RANK"])
         self.model = DDP(self.model)
+
+    # def wrap_mdoel_by_ddp(self):
+    #     self.gpu_id = int(os.environ["LOCAL_RANK"])
+    #     self.model = DDP(self.model)
 
     def _run_batch(self, input_ids, attention_masks, labels):
         outputs = self.model(
@@ -87,7 +88,7 @@ class Trainer:
             attention_masks = batch["attention_mask"].to(self.gpu_id)
             labels = batch["labels"].to(self.gpu_id)
             
-            self._run_batch( batch)
+            self._run_batch( input_ids, attention_masks, labels)
 
     def run(self, train_dataset, eval_dataset):
         model = self.model
@@ -258,7 +259,7 @@ def main():
         max_length = max_length,
         batch_size = batch_size,
         )
-    trainer.wrap_mdoel_by_ddp()
+    # trainer.wrap_mdoel_by_ddp()
     
     # execute trainer 
     trainer.run(
