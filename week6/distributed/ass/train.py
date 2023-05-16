@@ -9,6 +9,7 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, Trainer, TrainingArguments, logging, set_seed
 from torch.nn.parallel import DistributedDataParallel
+from torch.distributed import init_process_group, destroy_process_group
 
 
 
@@ -134,7 +135,10 @@ def create_datasets(tokenizer):
         return tokenized_full_prompt
     
     prompter = Prompter()
+
+
     dataset = load_dataset('json', split='train', data_files=data_path)
+
     dataset = dataset.train_test_split(test_size=size_valid_set, seed=seed)
 
     train_data = dataset["train"].shuffle().map(generate_and_tokenize_prompt)
@@ -155,6 +159,7 @@ print('End tokenizer')
 
 if "Llama" in architecture:
     print("Setting EOS, BOS, UNK, and PAD tokens for LLama tokenizer")
+    
     tokenizer.add_special_tokens(
         {
             "eos_token": "</s>",
@@ -179,12 +184,19 @@ trainer = Trainer(
     data_collator=data_collator,
 )
 
-from torch.distributed import init_process_group, destroy_process_group
-
 
 # Step 3: Configure DistributedDataParallel (DDP)
 world_size = torch.cuda.device_count()  # Number of available GPUs
 init_process_group(backend="nccl")  # Initialize the process group
+
+# Get the DDP rank
+ddp_rank = int(os.environ['RANK'])
+master_process = ddp_rank == 0 # this process will do logging, checkpointing etc.
+# Get the DDP local rank
+ddp_local_rank = int(os.environ['LOCAL_RANK'])
+# Set the cuda device
+device = f'cuda:{ddp_local_rank}'
+model.to(device)
 
 model = DistributedDataParallel(model)
 
