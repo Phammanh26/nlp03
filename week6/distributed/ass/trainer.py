@@ -152,6 +152,8 @@ class Trainer:
         self.iter_num = 0
         self.iter_time = time.time()
         data_iter = iter(train_loader)
+
+        print(f"data_iter type: {type(data_iter)}")
         while True:
             # fetch the next batch (x, y) and re-init iterator if needed
             try:
