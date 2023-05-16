@@ -11,6 +11,8 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, DataCo
 from torch.nn.parallel import DistributedDataParallel
 
 
+
+
 model_path = 'bigscience/bloom-560m'
 data_path = 'alpaca_data.json'
 output_dir = 'checkpoints/'
@@ -31,6 +33,11 @@ use_bf16 = False
 seed = 0
 log_freq = 1
 eval_freq = 150
+
+
+import gdown
+url_data_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
+gdown.download(url_data_path, data_path, quiet=False, fuzzy=True)
 
 class Prompter(object):
     __slots__ = ("template")
@@ -84,7 +91,7 @@ training_args = TrainingArguments(
         lr_scheduler_type=lr_scheduler_type,
         warmup_steps=num_warmup_steps,
         gradient_accumulation_steps=gradient_accumulation_steps,
-        fp16=not use_bf16,
+   
         bf16=use_bf16,
         weight_decay=weight_decay,
         ddp_find_unused_parameters=False,
