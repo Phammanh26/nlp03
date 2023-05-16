@@ -133,8 +133,10 @@ if __name__ =="__main__":
     data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
     
+    # Get tokenizer
+    tokenizer = load_tokenizer_from_pretrained_model()
     # Prepare dataset
-    train_dataset, eval_dataset = create_datasets(max_length=max_length)
+    train_dataset, eval_dataset = create_datasets(tokenizer = tokenizer, max_length=max_length)
 
     # Prepare model
     model = load_pretrained_model()
