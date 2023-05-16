@@ -1,6 +1,6 @@
+import time
 from typing import Union
-import argparse
-import os
+
 
 import torch
 from accelerate import Accelerator
@@ -8,15 +8,9 @@ from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, Trainer, TrainingArguments, logging, set_seed
-from torch.nn.parallel import DistributedDataParallel
-from torch.distributed import init_process_group, destroy_process_group
-import gdown
 
+import torch
 
-
-model_path = 'bigscience/bloom-560m'
-data_path = 'alpaca_data.json'
-output_dir = 'checkpoints/'
 
 size_valid_set = 0.1
 seq_length = 512
@@ -35,9 +29,6 @@ seed = 0
 log_freq = 1
 eval_freq = 150
 
-
-
-backend = "nccl"
 
 class Prompter(object):
     __slots__ = ("template")
@@ -71,33 +62,7 @@ class Prompter(object):
 
     def get_response(self, output: str) -> str:
         return output.split(self.template["response_split"])[1].strip()
-
-# Step 2: Initialize the Trainer
-training_args = TrainingArguments(
-        output_dir=output_dir,
-        dataloader_drop_last=True,
-        num_train_epochs=num_epochs,
-        evaluation_strategy="steps",
-        eval_steps=eval_freq,
-        # save_steps=save_freq,
-        save_total_limit=2,
-        per_device_train_batch_size=micro_batch_size,
-        per_device_eval_batch_size=micro_batch_size,
-        learning_rate=learning_rate,
-        lr_scheduler_type=lr_scheduler_type,
-        warmup_steps=num_warmup_steps,
-        gradient_accumulation_steps=gradient_accumulation_steps,
-   
-        bf16=use_bf16,
-        weight_decay=weight_decay,
-        ddp_find_unused_parameters=False,
-        logging_dir="./logs",
-        logging_strategy="steps",
-        logging_first_step=True,
-        logging_steps=log_freq,
-    )
-
-
+    
 def create_datasets(tokenizer):
     print("Start create_datasets")
     def tokenize(prompt, add_eos_token=True):
@@ -130,10 +95,7 @@ def create_datasets(tokenizer):
         return tokenized_full_prompt
     
     prompter = Prompter()
-
-
     dataset = load_dataset('json', split='train', data_files=data_path)
-
     dataset = dataset.train_test_split(test_size=size_valid_set, seed=seed)
 
     train_data = dataset["train"].shuffle().map(generate_and_tokenize_prompt)
@@ -143,44 +105,78 @@ def create_datasets(tokenizer):
     
     return train_data, valid_data
 
+class Trainer:
+    def __init__(
+            self, 
+            model, 
+            optimizer,
+            train_dataset,
+            eval_dataset,
+            data_collator,
+            batch_size):
+        
+        self.data_collator = data_collator
+        self.model = model
+        self.batch_size = batch_size
+        # setup the optimizer
+        self.optimizer = optimizer
+        self.optimizer = None
+        self.eval_dataset = eval_dataset
+        self.train_dataset = train_dataset
 
 
-print('Start config')
-config = AutoConfig.from_pretrained(model_path)
-architecture = config.architectures[0]
-print('Start tokenizer')
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-print('End tokenizer')
+        # variables that will be assigned to trainer class later for logging and etc
+        self.iter_num = 0
+        self.iter_time = 0.0
+        self.iter_dt = 0.0
 
-if "Llama" in architecture:
-    print("Setting EOS, BOS, UNK, and PAD tokens for LLama tokenizer")
-    
-    tokenizer.add_special_tokens(
-        {
-            "eos_token": "</s>",
-            "bos_token": "</s>",
-            "unk_token": "</s>",
-        }
-    )
-    tokenizer.pad_token_id = (
-        0  # unk. we want this to be different from the eos token
-    )
+    def run(self):
+        model, config = self.model, self.config
 
-train_dataset, eval_dataset = create_datasets(tokenizer)
+        # setup the dataloader
+        # Create the DataLoaders
+        train_loader = DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            collate_fn=self.data_collator
+        )
 
-data_collator=DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True)
+        model.train()
+        self.iter_num = 0
+        self.iter_time = time.time()
+        data_iter = iter(train_loader)
+        while True:
+            # fetch the next batch (x, y) and re-init iterator if needed
+            try:
+                batch = next(data_iter)
+            except StopIteration:
+                data_iter = iter(train_loader)
+                batch = next(data_iter)
+            batch = [t.to(self.device) for t in batch]
+            x, y = batch
 
+            # forward the model
+            logits, self.loss = model(x, y)
 
+            # backprop and update the parameters
+            model.zero_grad(set_to_none=True)
+            self.loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
+            self.optimizer.step()
 
+            self.iter_num += 1
+            tnow = time.time()
+            self.iter_dt = tnow - self.iter_time
+            self.iter_time = tnow
 
-# Step 3: Configure DistributedDataParallel (DDP)
-# world_size = torch.cuda.device_count()  # Number of available GPUs
-init_process_group()  # Initialize the process group
+            # termination conditions
+            if config.max_iters is not None and self.iter_num >= config.max_iters:
+                break
 
+model_path = 'bigscience/bloom-560m'
+data_path = 'alpaca_data.json'
+output_dir = 'checkpoints/'
 
-
-url_data_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
-gdown.download(url_data_path, data_path, quiet=False, fuzzy=True)
 
 model = AutoModelForCausalLM.from_pretrained(
         model_path,
@@ -204,33 +200,40 @@ model = get_peft_model(model, lora_config)
 model.print_trainable_parameters()
 
 
+optimizer = model.get_optimizer()
+
+
+
+print('Start config')
+config = AutoConfig.from_pretrained(model_path)
+architecture = config.architectures[0]
+print('Start tokenizer')
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+print('End tokenizer')
+
+if "Llama" in architecture:
+    print("Setting EOS, BOS, UNK, and PAD tokens for LLama tokenizer")
+    tokenizer.add_special_tokens(
+        {
+            "eos_token": "</s>",
+            "bos_token": "</s>",
+            "unk_token": "</s>",
+        }
+    )
+    tokenizer.pad_token_id = (
+        0  # unk. we want this to be different from the eos token
+    )
+
+    train_dataset, eval_dataset = create_datasets(tokenizer)
+
 trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=eval_dataset,
-    data_collator=data_collator,
-)
+        model=model,
+        optimizer=optimizer,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        data_collator=DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True),
+        batch_size = micro_batch_size
+        )
 
-
-# Get the DDP rank
-ddp_rank = int(os.environ['RANK'])
-master_process = ddp_rank == 0 # this process will do logging, checkpointing etc.
-# Get the DDP local rank
-ddp_local_rank = int(os.environ['LOCAL_RANK'])
-# Set the cuda device
-device = f'cuda:{ddp_local_rank}'
-model.to(device)
-
-
-model = DistributedDataParallel(model)
-
-
-# Step 4: Train the model using Trainer
-trainer.train()
-
-# Step 5: Save the trained model
-trainer.save_model("./trained_model")
-
-
-destroy_process_group()
+trainer.run()
+        
