@@ -5,6 +5,7 @@ from typing import Union
 import torch
 from accelerate import Accelerator
 from datasets import load_dataset
+from torch.utils.data import DataLoader, Dataset
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, Trainer, TrainingArguments, logging, set_seed
@@ -200,7 +201,7 @@ model = get_peft_model(model, lora_config)
 model.print_trainable_parameters()
 
 
-optimizer = model.get_optimizer()
+optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
 
 
 
