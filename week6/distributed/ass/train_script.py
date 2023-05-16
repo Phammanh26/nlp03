@@ -123,6 +123,8 @@ def load_tokenizer_from_pretrained_model():
         tokenizer.pad_token_id = (
             0  # unk. we want this to be different from the eos token
         )
+    
+    return tokenizer
 
 def download_from_driver(data_driver_path, location_path):
     gdown.download(data_driver_path, location_path, quiet=False, fuzzy=True)
