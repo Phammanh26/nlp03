@@ -225,7 +225,7 @@ if "Llama" in architecture:
         0  # unk. we want this to be different from the eos token
     )
 
-    train_dataset, eval_dataset = create_datasets(tokenizer)
+train_dataset, eval_dataset = create_datasets(tokenizer)
 
 trainer = Trainer(
         model=model,
