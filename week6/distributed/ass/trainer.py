@@ -31,6 +31,10 @@ log_freq = 1
 eval_freq = 150
 
 
+model_path = 'bigscience/bloom-560m'
+data_path = 'alpaca_data.json'
+output_dir = 'checkpoints/'
+
 class Prompter(object):
     __slots__ = ("template")
 
@@ -96,6 +100,8 @@ def create_datasets(tokenizer):
         return tokenized_full_prompt
     
     prompter = Prompter()
+
+    print(f"load dataset {data_path}")
     dataset = load_dataset('json', split='train', data_files=data_path)
     dataset = dataset.train_test_split(test_size=size_valid_set, seed=seed)
 
@@ -174,9 +180,7 @@ class Trainer:
             if config.max_iters is not None and self.iter_num >= config.max_iters:
                 break
 
-model_path = 'bigscience/bloom-560m'
-data_path = 'alpaca_data.json'
-output_dir = 'checkpoints/'
+
 
 import gdown
 url_data_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
