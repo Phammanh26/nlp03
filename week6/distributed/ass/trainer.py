@@ -259,6 +259,7 @@ def main():
         batch_size = batch_size,
         device = device
         )
+    trainer.wrap_mdoel_by_ddp()
     
     # execute trainer 
     trainer.run(
