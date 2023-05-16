@@ -9,6 +9,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 import os
 
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'  # Chỉ chọn GPU1
 
 def ddp_setup(rank, world_size):
     """
@@ -84,15 +85,23 @@ def prepare_dataloader(dataset: Dataset, batch_size: int):
 
 
 def main(rank: int, world_size: int, save_every: int, total_epochs: int, batch_size: int):
+
+    print("Setup DDP: rank = {rank}, world_size: {world_size}")
     ddp_setup(rank, world_size)
+    print("Completed Setup DDP")
+
+    print("Load load_train_objs")
     dataset, model, optimizer = load_train_objs()
     train_data = prepare_dataloader(dataset, batch_size)
     trainer = Trainer(model, train_data, optimizer, rank, save_every)
+
+    print("Training.....")
     trainer.train(total_epochs)
     destroy_process_group()
 
 
 if __name__ == "__main__":
+
     import argparse
     parser = argparse.ArgumentParser(description='simple distributed training job')
     parser.add_argument('total_epochs', type=int, help='Total epochs to train the model')
@@ -102,4 +111,4 @@ if __name__ == "__main__":
     
     world_size = torch.cuda.device_count()
     print(f"World size correspond to num GPU: {world_size}")
-    mp.spawn(main, args=(world_size, args.save_every, args.total_epochs, args.batch_size), nprocs=world_size)
+    mp.spawn(main, args=(world_size, args.save_every, args.total_epochs, args.batch_size), nprocs=1)
