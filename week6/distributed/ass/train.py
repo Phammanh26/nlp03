@@ -212,4 +212,4 @@ trainer.train()
 trainer.save_model("./trained_model")
 
 
-# destroy_process_group()
+destroy_process_group()
