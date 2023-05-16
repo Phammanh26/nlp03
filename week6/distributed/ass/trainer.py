@@ -178,6 +178,9 @@ model_path = 'bigscience/bloom-560m'
 data_path = 'alpaca_data.json'
 output_dir = 'checkpoints/'
 
+import gdown
+url_data_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
+gdown.download(url_data_path, data_path, quiet=False, fuzzy=True)
 
 model = AutoModelForCausalLM.from_pretrained(
         model_path,
