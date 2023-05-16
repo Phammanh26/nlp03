@@ -175,7 +175,7 @@ data_collator=DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=8, return_ten
 
 # Step 3: Configure DistributedDataParallel (DDP)
 # world_size = torch.cuda.device_count()  # Number of available GPUs
-init_process_group(backend=backend)  # Initialize the process group
+init_process_group()  # Initialize the process group
 
 
 
