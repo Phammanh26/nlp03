@@ -36,10 +36,6 @@ log_freq = 1
 eval_freq = 150
 
 
-import gdown
-url_data_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
-gdown.download(url_data_path, data_path, quiet=False, fuzzy=True)
-
 
 backend = "nccl"
 
@@ -188,6 +184,10 @@ trainer = Trainer(
 # world_size = torch.cuda.device_count()  # Number of available GPUs
 init_process_group(backend=backend)  # Initialize the process group
 
+
+import gdown
+url_data_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
+gdown.download(url_data_path, data_path, quiet=False, fuzzy=True)
 
 model = AutoModelForCausalLM.from_pretrained(
         model_path,
