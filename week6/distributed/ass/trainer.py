@@ -6,7 +6,6 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.nn.functional as F
-from trainer import Trainer
 import torch.multiprocessing as mp
 from torch.distributed import init_process_group, destroy_process_group
 from utils import Prompter
