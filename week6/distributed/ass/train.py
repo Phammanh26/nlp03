@@ -10,7 +10,7 @@ from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, Trainer, TrainingArguments, logging, set_seed
 from torch.nn.parallel import DistributedDataParallel
 from torch.distributed import init_process_group, destroy_process_group
-
+import gdown
 
 
 
@@ -171,13 +171,6 @@ train_dataset, eval_dataset = create_datasets(tokenizer)
 data_collator=DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True)
 
 
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=eval_dataset,
-    data_collator=data_collator,
-)
 
 
 # Step 3: Configure DistributedDataParallel (DDP)
@@ -185,7 +178,7 @@ trainer = Trainer(
 init_process_group(backend=backend)  # Initialize the process group
 
 
-import gdown
+
 url_data_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
 gdown.download(url_data_path, data_path, quiet=False, fuzzy=True)
 
@@ -209,6 +202,16 @@ lora_config = LoraConfig(
 model = get_peft_model(model, lora_config)
 
 model.print_trainable_parameters()
+
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=eval_dataset,
+    data_collator=data_collator,
+)
+
 
 # Get the DDP rank
 ddp_rank = int(os.environ['RANK'])
