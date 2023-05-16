@@ -212,6 +212,7 @@ def load_pretrained_model():
         trust_remote_code=True,
         load_in_8bit=True,
         torch_dtype=torch.float16,
+        device_map='auto'
     )
     model = prepare_model_for_int8_training(model)
 
