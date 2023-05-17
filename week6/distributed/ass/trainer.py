@@ -62,8 +62,7 @@ class Trainer:
         self.max_length = max_length
         self.batch_size = batch_size
         self.gpu_id = gpu_id
-        print(f"gpu_id: {gpu_id}")
-        model.to(self.gpu_id)
+        model = model.to(self.gpu_id)
         self.model = DDP(model, device_ids=[self.gpu_id])
 
     # def wrap_mdoel_by_ddp(self):
@@ -84,6 +83,7 @@ class Trainer:
         self.optimizer.step()
 
     def _run_epoch(self,train_loader, epoch):
+        
         print(f"\n [GPU{self.gpu_id}] | Epoch {epoch} | Steps: {len(train_loader)}")
         print(f"\n device model's is: {next(self.model.parameters()).device}")
         
