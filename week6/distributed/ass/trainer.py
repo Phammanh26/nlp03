@@ -142,6 +142,12 @@ def create_datasets(tokenizer, max_length):
             data_point["output"],
         )
         tokenized_full_prompt = tokenize(full_prompt)
+
+        # Chuyển đổi thiết bị của các tensors trong `tokenized_full_prompt`
+        for key, value in tokenized_full_prompt.items():
+            if isinstance(value, torch.Tensor):
+                tokenized_full_prompt[key] = value.to(self.gpu_id)
+
         return tokenized_full_prompt
     
     prompter = Prompter()
