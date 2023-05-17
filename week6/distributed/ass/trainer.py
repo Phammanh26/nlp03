@@ -164,7 +164,7 @@ class Trainer:
             
             # Evaluate after each epoch
             self.model.eval()
-            eval_loss = self._eval(eval_dataloader = data_testloader)
+            eval_loss = self._eval(eval_dataloader = data_testloader, epoch = epoch)
             
             if self.is_master_process():
                 print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
@@ -223,6 +223,7 @@ def load_pretrained_model():
 
 
 if __name__ == "__main__":
+    DEBUG = True
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     data_path = 'alpaca_data.json'
@@ -243,15 +244,15 @@ if __name__ == "__main__":
     log_freq = 1
     eval_freq = 150
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
-
+    
     logger = get_logger()
 
     
     init_process_group(backend=backend)
-    # Download data
-    download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
-    
-    
+
+    if DEBUG == False:
+        # Download data
+        download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
 
     local_rank =  int(os.environ["LOCAL_RANK"])
     # Get tokenizer
