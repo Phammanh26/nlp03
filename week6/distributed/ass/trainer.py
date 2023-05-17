@@ -86,7 +86,7 @@ class Trainer:
         self.logger.info(f"Completed training epoch: {epoch} | train loss = {epoch_loss}")
         return epoch_loss
 
-    def run(self):
+    def run(self, data_path: str, size_valid_set: int = 0.25, seed:int=123):
         """
         Run the training process.
 
@@ -95,8 +95,12 @@ class Trainer:
         """
         # Prepare dataset
         train_dataset, eval_dataset = create_datasets(
-            tokenizer=self.tokenizer, 
-            max_length=self.max_length)
+            tokenizer = self.tokenizer,
+            max_length = self.max_length,
+            data_path = data_path,
+            size_valid_set = size_valid_set,
+            seed = seed
+           )
         
         # Create the DataLoaders
         data_trainloader = DataLoader(
@@ -194,7 +198,6 @@ if __name__ == "__main__":
     logger = get_logger()
 
     init_process_group(backend=backend)
-    
     # Download data
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
 
@@ -215,6 +218,10 @@ if __name__ == "__main__":
         tokenizer=tokenizer)
     
     # execute trainer 
-    trainer.run()
+    trainer.run(
+        data_path = data_path,
+        size_valid_set = size_valid_set,
+        seed =seed
+    )
 
     destroy_process_group()
