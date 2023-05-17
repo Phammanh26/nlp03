@@ -99,10 +99,10 @@ class Trainer:
             batch_size = self.batch_size,
             sampler=DistributedSampler(train_dataset),
             collate_fn=lambda x: {
-        "input_ids": torch.stack([sample["input_ids"] for sample in x]),
-        "attention_mask": torch.stack([sample["attention_mask"] for sample in x]),
-        "labels": torch.stack([sample["labels"] for sample in x]),
-    },)
+                "input_ids": torch.stack([sample["input_ids"] for sample in x]),
+                "attention_mask": torch.stack([sample["attention_mask"] for sample in x]),
+                "labels": torch.stack([sample["labels"] for sample in x]),
+            })
         
         total_loss = 0
 
@@ -252,6 +252,7 @@ if __name__ == "__main__":
     model = load_pretrained_model()
     # Prepare optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    optimizer.to(local_rank)
     
     # Download data
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
