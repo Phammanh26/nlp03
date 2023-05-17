@@ -1,8 +1,7 @@
 import os
 import torch
 from tqdm import tqdm
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.distributed import init_process_group, destroy_process_group
+
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
@@ -11,7 +10,8 @@ from transformers import (
     AutoModelForCausalLM, 
     AutoTokenizer, 
   )
-
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
 from accelerate import Accelerator
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader, SequentialSampler
@@ -47,12 +47,15 @@ class Trainer:
         self.model = model.to(f"cuda:{self.gpu_id}")
         # Setup the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
-        self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
+        
 
     def is_master_process(self):
         ddp_rank = int(os.environ['RANK'])
         return ddp_rank == 0
     
+    def set_ddp(self):
+        self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
+        
     def _run_batch(self, batch):
         """
         Run a single training batch.
@@ -161,7 +164,7 @@ class Trainer:
             
             # Evaluate after each epoch
             self.model.eval()
-            eval_loss = self._eval(eval_loader = data_testloader)
+            eval_loss = self._eval(eval_dataloader = data_testloader)
             
             if self.is_master_process():
                 print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
@@ -225,9 +228,9 @@ if __name__ == "__main__":
     data_path = 'alpaca_data.json'
     output_dir = 'checkpoints/'
     size_valid_set = 0.1
-    max_length = 256
+    max_length = 128
     num_epochs = 30
-    batch_size = 8
+    batch_size = 16
     gradient_accumulation_steps = 8
 
     learning_rate = 1e-5
