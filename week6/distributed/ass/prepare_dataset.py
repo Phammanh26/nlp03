@@ -1,7 +1,6 @@
-from utils import Prompter
+from prompt import Prompter
 from datasets import load_dataset
 from utils.logger_utils import get_logger
-
 
 logger = get_logger()
 
