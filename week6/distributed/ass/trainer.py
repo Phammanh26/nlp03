@@ -62,8 +62,9 @@ class Trainer:
         self.max_length = max_length
         self.batch_size = batch_size
         self.gpu_id = gpu_id
-        model = model.to(self.gpu_id)
-        self.model = DDP(model, device_ids=[self.gpu_id], output_device=self.gpu_id)
+        
+        self.model = model.to(self.gpu_id)
+        self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
 
     # def wrap_mdoel_by_ddp(self):
     #     self.gpu_id = int(os.environ["LOCAL_RANK"])
