@@ -283,7 +283,6 @@ if __name__ == "__main__":
         is_ddp_training = is_ddp_training)
     
     # set ddp for wraping model
-    trainer.set_ddp()
     # execute trainer 
     trainer.run(
         data_path = data_path,
