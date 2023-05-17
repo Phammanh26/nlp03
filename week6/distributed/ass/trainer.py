@@ -52,11 +52,10 @@ class Trainer:
             num_epochs,
             max_length,
             batch_size,
-            gpu_id,
-            data_trainloader
+            gpu_id
+            
             ):
         
-        self.data_trainloader = data_trainloader
         self.num_epochs = num_epochs
         self.max_length = max_length
         self.batch_size = batch_size
@@ -85,16 +84,15 @@ class Trainer:
 
         return epoch_loss
 
-    def run(self, eval_dataset):
+    def run(self, data_trainloader, eval_dataset):
         avg_loss = 0
-        total_loss = 0
         for epoch in range(self.num_epochs):
             self.model.train()
-            epoch_loss = self._run_epoch(self.data_trainloader, epoch)
+            epoch_loss = self._run_epoch(data_trainloader, epoch)
             avg_loss += epoch_loss
             print(f"epoch {epoch + 1} | train loss = {epoch_loss}")
 
-        print(f"avg | train loss = {avg_loss/self.num_epochs}")
+        print(f"total epoch: {self.num_epochs} | avg train loss = {avg_loss/self.num_epochs}")
 
             # TODO
             # evaluate
@@ -225,13 +223,11 @@ if __name__ == "__main__":
     # Prepare model
     model = load_pretrained_model()
     
-    
-
     # Create the DataLoaders
     data_trainloader = DataLoader(
         train_dataset,
         batch_size = batch_size,
-        sampler=DistributedSampler(train_dataset),
+        sampler=ẻ(train_dataset),
         collate_fn=lambda x: {
             "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
             "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
