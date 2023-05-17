@@ -277,7 +277,7 @@ if __name__ == "__main__":
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
     
-    print(f"DEBUG device { Accelerator().process_index} | { torch.cuda.current_device()}")
+    print(f"DEBUG device Accelerator = { Accelerator().process_index} | current_device = { torch.cuda.current_device()} | local_rank = {local_rank}")
     # Prepare model
     model = load_pretrained_model()
     
