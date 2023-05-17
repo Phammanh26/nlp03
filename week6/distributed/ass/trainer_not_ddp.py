@@ -95,8 +95,7 @@ class Trainer:
         
         epoch_loss = 0
         self.model.train()
-        if self.is_ddp_training:
-            train_dataloader.sampler.set_epoch(epoch)
+        
         if self.is_master_process():
             train_progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1} [Training]", position=0, leave=False)
         else:
@@ -168,19 +167,20 @@ class Trainer:
            )
         
         
-        data_trainloader, data_testloader = self.prepare_dataloader(train_dataset, eval_dataset)
+        train_dataloader, eval_dataloader = self.prepare_dataloader(train_dataset, eval_dataset)
         
         avg_train_loss = 0
         if self.is_master_process():
             print(f"Start training | total epochs: {self.num_epochs}")
         
         for epoch in range(self.num_epochs):
-           
-            train_loss = self._run_epoch(data_trainloader, epoch)
+            if self.is_ddp_training:
+                train_dataloader.sampler.set_epoch(epoch)
+            train_loss = self._run_epoch(train_dataloader, epoch)
             avg_train_loss += train_loss
             
             # Evaluate after each epoch
-            eval_loss = self._eval(eval_dataloader = data_testloader, epoch = epoch)
+            eval_loss = self._eval(eval_dataloader = eval_dataloader, epoch = epoch)
             
             if self.is_master_process():
                 print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
