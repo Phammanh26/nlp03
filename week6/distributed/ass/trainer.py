@@ -110,7 +110,8 @@ class Trainer:
             eval_progress_bar = eval_dataloader
         
         for batch in eval_progress_bar:
-            outputs = self.model(**batch) 
+            with torch.no_grad():
+                outputs = self.model(**batch) 
             avg_loss += outputs.loss
         avg_loss = avg_loss/(len(eval_dataloader))
         return avg_loss
