@@ -92,7 +92,8 @@ class Trainer:
         
         epoch_loss = 0
         self.model.train()
-        train_dataloader.sampler.set_epoch(epoch)
+        if self.is_ddp_training():
+            train_dataloader.sampler.set_epoch(epoch)
         if self.is_master_process():
             train_progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1} [Training]", position=0, leave=False)
         else:
