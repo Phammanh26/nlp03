@@ -176,10 +176,7 @@ def create_datasets(tokenizer, max_length, gpu_id):
 
 def ddp_setup():
     init_process_group(backend="nccl")
-    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
     
-
-
 def load_tokenizer_from_pretrained_model(model_path):
     print('Start config')
     config = AutoConfig.from_pretrained(model_path)
@@ -252,7 +249,6 @@ if __name__ == "__main__":
     model = load_pretrained_model()
     # Prepare optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-    optimizer.to(local_rank)
     
     # Download data
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
