@@ -118,9 +118,8 @@ def create_datasets(tokenizer, max_length):
             prompt,
             truncation=True,
             max_length=max_length,
-            padding="max_length",
-            return_tensors="pt",
-        )
+            padding="max_length"
+            )
 
         if (
             result["input_ids"][-1] != tokenizer.eos_token_id
