@@ -213,9 +213,7 @@ def load_pretrained_model():
 
 
 if __name__ == "__main__":
-
     ddp_setup()
-
     local_rank =  int(os.environ["LOCAL_RANK"])
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
@@ -227,8 +225,6 @@ if __name__ == "__main__":
     
     # Prepare model
     model = load_pretrained_model()
-    
-    
     # Download data
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
