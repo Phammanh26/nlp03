@@ -83,7 +83,7 @@ class Trainer:
         
         train_loader.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
-            batch = {k: v.to(device) for k, v in batch.items()}
+            batch = {k: v.to(self.gpu_id) for k, v in batch.items()}
             self._run_batch(batch)
 
     def run(self, train_dataset, eval_dataset):
