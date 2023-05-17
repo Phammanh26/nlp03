@@ -7,7 +7,6 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
-from utils import download_from_driver
 from transformers import (
     AutoConfig, 
     AutoModelForCausalLM, 
