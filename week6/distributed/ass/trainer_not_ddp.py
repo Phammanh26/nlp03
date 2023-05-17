@@ -103,6 +103,7 @@ class Trainer:
             train_progress_bar = train_dataloader
         
         for step, batch in enumerate(tqdm(train_progress_bar)):
+            print(f"step [{step}] | {self.gpu_id}")
             loss = self._run_batch(batch)
             epoch_loss += loss
         
@@ -260,7 +261,7 @@ if __name__ == "__main__":
     data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
     
     logger = get_logger()
-    is_ddp_training = False
+    is_ddp_training = True
     
     if is_ddp_training:
         init_process_group(backend=backend)
