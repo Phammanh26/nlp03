@@ -1,5 +1,5 @@
 from typing import Union
-import gdown
+
 class Prompter(object):
     __slots__ = ("template")
 
@@ -33,6 +33,3 @@ class Prompter(object):
     def get_response(self, output: str) -> str:
         return output.split(self.template["response_split"])[1].strip()
 
-def download_from_driver(data_driver_path, location_path):
-    print(f"begin download....: {data_driver_path}")
-    gdown.download(data_driver_path, location_path, quiet=False, fuzzy=True)
