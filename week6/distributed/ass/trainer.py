@@ -70,7 +70,7 @@ class Trainer:
     #     self.model = DDP(self.model)
 
     def _run_batch(self,batch):
-        check_input_device(batch, self.gpu_id)
+        # check_input_device(batch, self.gpu_id)
         self.optimizer.zero_grad()
         outputs = self.model(**batch) 
         loss = outputs.loss
