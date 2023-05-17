@@ -62,6 +62,7 @@ class Trainer:
         self.max_length = max_length
         self.batch_size = batch_size
         self.gpu_id = gpu_id
+
         model = model.to(self.gpu_id)
         self.model = DDP(model, device_ids=[self.gpu_id])
 
@@ -151,7 +152,7 @@ def create_datasets(tokenizer, max_length):
 
     train_data = dataset["train"].shuffle().map(generate_and_tokenize_prompt)
     valid_data = dataset["test"].map(generate_and_tokenize_prompt)
-
+    train_data.set_format("torch")
     
     
     dataset["test"].to_json('dataset/val_data.json')
