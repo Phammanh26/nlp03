@@ -14,7 +14,7 @@ from transformers import (
   )
 
 from accelerate import Accelerator
-from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data.distributed import DistributedSampler, SequentialSampler
 
 from utils.common import download_from_driver
 from utils.logger_utils import get_logger
@@ -48,6 +48,9 @@ class Trainer:
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
 
+    def is_master_process(self):
+        ddp_rank = int(os.environ['RANK'])
+        return ddp_rank == 0
     
     def _run_batch(self, batch):
         """
@@ -67,7 +70,7 @@ class Trainer:
 
         return loss.item()
 
-    def _run_epoch(self, train_loader, epoch):
+    def _run_epoch(self, train_dataloader, epoch):
         """
         Run a single training epoch.
 
@@ -80,22 +83,32 @@ class Trainer:
         """
         
         epoch_loss = 0
-        train_loader.sampler.set_epoch(epoch)
+        train_dataloader.sampler.set_epoch(epoch)
+        if self.is_master_process():
+            train_progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1} [Training]", position=0, leave=True)
+        else:
+            train_progress_bar = train_dataloader
         
-        for step, batch in enumerate(tqdm(train_loader)):
+        for step, batch in enumerate(tqdm(train_progress_bar)):
             loss = self._run_batch(batch)
             epoch_loss += loss
         
         return epoch_loss
 
-    def _eval(self, eval_loader):
+    def _eval(self, eval_dataloader, epoch: int):
         # TODO: Evaluation
         avg_loss = 0
         model.eval()
-        for step, batch in enumerate(tqdm(eval_loader)):
+
+        if self.is_master_process():
+            eval_progress_bar = tqdm(eval_dataloader, desc=f"Epoch {epoch + 1} [Evaluation]", position=0, leave=True)
+        else:
+            eval_progress_bar = eval_dataloader
+        
+        for batch in eval_progress_bar:
             outputs = self.model(**batch) 
             avg_loss += outputs.loss
-        avg_loss = avg_loss/(step+1)
+        avg_loss = avg_loss/(len(eval_dataloader))
         return avg_loss
     
     def run(self, data_path: str, size_valid_set: int = 0.25, seed:int=123):
@@ -129,7 +142,7 @@ class Trainer:
         data_testloader = DataLoader(
             eval_dataset,
             batch_size=self.batch_size,
-            sampler=DistributedSampler(train_dataset),
+            sampler=SequentialSampler(eval_dataset),
             collate_fn=lambda x: {
                 "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
                 "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
@@ -137,7 +150,9 @@ class Trainer:
             })
         
         avg_train_loss = 0
-        print(f"Start training | total epochs: {self.num_epochs}")
+        if self.is_master_process():
+            print(f"Start training | total epochs: {self.num_epochs}")
+        
         for epoch in range(self.num_epochs):
             self.model.train()
             train_loss = self._run_epoch(data_trainloader, epoch)
@@ -147,9 +162,13 @@ class Trainer:
             self.model.eval()
             eval_loss = self._eval(eval_loader = data_testloader)
             
-            print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
+            if self.is_master_process():
+                print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
 
-        print(f"Completed training | avg train loss = {avg_train_loss/self.num_epochs}")
+
+
+        if self.is_master_process():
+            print(f"Completed training | avg train loss = {avg_train_loss/self.num_epochs}")
 
        
 
@@ -223,9 +242,12 @@ if __name__ == "__main__":
 
     logger = get_logger()
 
+    
     init_process_group(backend=backend)
     # Download data
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
+    
+    
 
     local_rank =  int(os.environ["LOCAL_RANK"])
     # Get tokenizer
