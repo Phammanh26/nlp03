@@ -214,26 +214,22 @@ def load_pretrained_model():
     return model
 
 
+if __name__ == "__main__":
 
-def main():
-
+    ddp_setup()
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
     # Prepare dataset
     train_dataset, eval_dataset = create_datasets(tokenizer = tokenizer, max_length=max_length)
-
     # Prepare model
     model = load_pretrained_model()
-
     # Prepare optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     
-    ddp_setup()
-    local_rank =  int(os.environ["LOCAL_RANK"])
     # Download data
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
-    
+    local_rank =  int(os.environ["LOCAL_RANK"])
     # prepare trainer
     trainer = Trainer(
         model = model, 
@@ -243,7 +239,6 @@ def main():
         batch_size = batch_size,
         gpu_id=local_rank
         )
-    # trainer.wrap_mdoel_by_ddp()
     
     # execute trainer 
     trainer.run(
@@ -251,14 +246,4 @@ def main():
         eval_dataset=eval_dataset
     )
 
-
     destroy_process_group()
-
-
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description='simple distributed training job')
-    
-    args = parser.parse_args()
-    
-    main()
