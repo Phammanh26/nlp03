@@ -20,30 +20,6 @@ from utils.common import download_from_driver
 from utils.logger_utils import get_logger
 from prepare_dataset import create_datasets
 
-model_path = 'bigscience/bloom-560m'
-data_path = 'alpaca_data.json'
-output_dir = 'checkpoints/'
-size_valid_set = 0.1
-max_length = 256
-num_epochs = 30
-batch_size = 8
-gradient_accumulation_steps = 8
-
-
-learning_rate = 1e-5
-lr_scheduler_type = 'cosine'
-num_warmup_steps = 100
-weight_decay = 0.06
-
-use_bf16 = False
-seed = 0
-log_freq = 1
-eval_freq = 150
-
-data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
-
-logger = get_logger()
-
 
 class Trainer:
     def __init__( self, model, tokenizer, gpu_id: int,  num_epochs: int = 10,max_length: int = 128, batch_size: int = 8 ):
@@ -195,6 +171,28 @@ def load_pretrained_model():
 
 if __name__ == "__main__":
     backend = "nccl"
+    model_path = 'bigscience/bloom-560m'
+    data_path = 'alpaca_data.json'
+    output_dir = 'checkpoints/'
+    size_valid_set = 0.1
+    max_length = 256
+    num_epochs = 30
+    batch_size = 8
+    gradient_accumulation_steps = 8
+
+    learning_rate = 1e-5
+    lr_scheduler_type = 'cosine'
+    num_warmup_steps = 100
+    weight_decay = 0.06
+
+    use_bf16 = False
+    seed = 0
+    log_freq = 1
+    eval_freq = 150
+    data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
+
+    logger = get_logger()
+
     init_process_group(backend=backend)
     
     # Download data

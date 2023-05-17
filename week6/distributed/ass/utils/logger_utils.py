@@ -21,3 +21,5 @@ def get_logger():
     filter_2 = NoPythonDotEnvFilter()
     logger.addFilter(filter_1)
     logger.addFilter(filter_2)
+
+    return logger
