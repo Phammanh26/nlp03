@@ -210,7 +210,7 @@ def load_tokenizer_from_pretrained_model(model_path):
 
 
 
-def load_pretrained_model(device):
+def load_pretrained_model():
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         trust_remote_code=True,
@@ -227,9 +227,6 @@ def load_pretrained_model(device):
         bias="none",
         task_type="CAUSAL_LM",
     )
-
-    model.to(device)
-
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
@@ -252,7 +249,7 @@ def main():
     train_dataset, eval_dataset = create_datasets(tokenizer = tokenizer, max_length=max_length)
 
     # Prepare model
-    model = load_pretrained_model(device)
+    model = load_pretrained_model()
 
     # Prepare optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
