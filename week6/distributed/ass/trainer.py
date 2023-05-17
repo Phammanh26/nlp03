@@ -69,14 +69,8 @@ class Trainer:
     #     self.gpu_id = int(os.environ["LOCAL_RANK"])
     #     self.model = DDP(self.model)
 
-    def _run_batch(self, input_ids, attention_masks, labels):
-        
-        
-        outputs = self.model(
-            input_ids = input_ids,  
-            attention_mask=attention_masks, 
-            labels = labels)
-                
+    def _run_batch(self,batch):
+        outputs = self.model(**batch) 
         self.optimizer.zero_grad()
         loss = outputs.loss
         loss.backward()
@@ -89,11 +83,8 @@ class Trainer:
         
         train_loader.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
-            input_ids = batch["input_ids"].to(self.gpu_id)
-            attention_masks = batch["attention_mask"].to(self.gpu_id)
-            labels = batch["labels"].to(self.gpu_id)
-            
-            self._run_batch(input_ids, attention_masks, labels)
+            batch = {k: v.to(device) for k, v in batch.items()}
+            self._run_batch(batch)
 
     def run(self, train_dataset, eval_dataset):
         model = self.model
