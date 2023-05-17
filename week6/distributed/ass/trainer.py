@@ -90,7 +90,7 @@ class Trainer:
         self.model.train()
         train_dataloader.sampler.set_epoch(epoch)
         if self.is_master_process():
-            train_progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1} [Training]", position=0, leave=True)
+            train_progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1} [Training]", position=0, leave=False)
         else:
             train_progress_bar = train_dataloader
         
@@ -105,7 +105,7 @@ class Trainer:
         avg_loss = 0
         model.eval()
         if self.is_master_process():
-            eval_progress_bar = tqdm(eval_dataloader, desc=f"Epoch {epoch + 1} [Evaluation]", position=0, leave=True)
+            eval_progress_bar = tqdm(eval_dataloader, desc=f"Epoch {epoch + 1} [Evaluation]", position=0, leave=False)
         else:
             eval_progress_bar = eval_dataloader
         
