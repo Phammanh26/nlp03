@@ -65,35 +65,38 @@ class Trainer:
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
 
-    # def wrap_mdoel_by_ddp(self):
-    #     self.gpu_id = int(os.environ["LOCAL_RANK"])
-    #     self.model = DDP(self.model)
-
     def _run_batch(self,batch):
-        # check_input_device(batch, self.gpu_id)
         self.optimizer.zero_grad()
         outputs = self.model(**batch) 
         loss = outputs.loss
         loss.backward()
         self.optimizer.step()
 
+        return loss.item()
+
     def _run_epoch(self,train_loader, epoch):
         
         print(f"\n [GPU{self.gpu_id}] | Epoch {epoch} | Steps: {len(train_loader)}")
         print(f"\n device model's is: {next(self.model.parameters()).device}")
         
+        epoch_loss = 0
         train_loader.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
-            self._run_batch(batch)
+            loss = self._run_batch(batch)
+            epoch_loss += loss
+
+        return epoch_loss
 
     def run(self, eval_dataset):
-        
-        
+        avg_loss = 0
         total_loss = 0
         for epoch in range(self.num_epochs):
             self.model.train()
-            self._run_epoch(self.data_trainloader, epoch)
-            print(f"Epoch {epoch + 1}, train total loss: {total_loss}")
+            epoch_loss = self._run_epoch(self.data_trainloader, epoch)
+            avg_loss += epoch_loss
+            print(f"epoch {epoch + 1} | train loss = {epoch_loss}")
+
+        print(f"avg | train loss = {avg_loss/self.num_epochs}")
 
             # TODO
             # evaluate
@@ -180,16 +183,6 @@ def load_tokenizer_from_pretrained_model(model_path):
         )
     
     return tokenizer
-
-
-def check_input_device(batch, gpu_id):
-    for key, value in batch.items():
-        if isinstance(value, torch.Tensor):
-            if value.dim() > 0:
-                for i in range(value.size(0)):
-                    print(f"GPU_{gpu_id} | {key}[{i}]: {value[i].device}")
-            else:
-                print(f"GPU_{gpu_id} | {key}: {value.device}")
 
 def load_pretrained_model():
     model = AutoModelForCausalLM.from_pretrained(
