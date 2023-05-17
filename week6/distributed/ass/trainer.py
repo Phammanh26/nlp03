@@ -60,7 +60,7 @@ class Trainer:
         self.num_epochs = num_epochs
         self.max_length = max_length
         self.batch_size = batch_size
-        self.gpu_id = f'cuda:{int(os.environ["LOCAL_RANK"])}'
+        self.gpu_id = int(os.environ["LOCAL_RANK"])
 
         model.to(self.gpu_id)
         self.model = DDP(model, device_ids=[self.gpu_id])
