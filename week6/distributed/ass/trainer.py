@@ -62,7 +62,7 @@ class Trainer:
         self.max_length = max_length
         self.batch_size = batch_size
         self.gpu_id = gpu_id
-
+        print(f"gpu_id: {gpu_id}")
         model.to(self.gpu_id)
         self.model = DDP(model, device_ids=[self.gpu_id])
 
@@ -72,6 +72,7 @@ class Trainer:
 
     def _run_batch(self, input_ids, attention_masks, labels):
         
+        print(f"device model's is: {next(self.model.parameters()).device}")
         outputs = self.model(
             input_ids = input_ids,  
             attention_mask=attention_masks, 
@@ -83,7 +84,7 @@ class Trainer:
         self.optimizer.step()
 
     def _run_epoch(self,train_loader, epoch):
-        print(f"[GPU{self.gpu_id}] Epoch {epoch} | Steps: {len(train_loader)}")
+        print(f"[GPU{self.gpu_id}] | Epoch {epoch} | Steps: {len(train_loader)}")
         
         train_loader.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
@@ -91,7 +92,7 @@ class Trainer:
             attention_masks = batch["attention_mask"].to(self.gpu_id)
             labels = batch["labels"].to(self.gpu_id)
             
-            self._run_batch( input_ids, attention_masks, labels)
+            self._run_batch(input_ids, attention_masks, labels)
 
     def run(self, train_dataset, eval_dataset):
         model = self.model
