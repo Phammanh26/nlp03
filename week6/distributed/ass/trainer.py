@@ -50,12 +50,11 @@ class Trainer:
             num_epochs,
             max_length,
             batch_size,
-            gpu_id
+            gpu_id,
+            data_trainloader
             ):
         
-       
-        
-
+        self.data_trainloader = data_trainloader
         self.num_epochs = num_epochs
         self.max_length = max_length
         self.batch_size = batch_size
@@ -72,7 +71,6 @@ class Trainer:
 
     def _run_batch(self,batch):
         check_input_device(batch, self.gpu_id)
-        
         self.optimizer.zero_grad()
         outputs = self.model(**batch) 
         loss = outputs.loss
@@ -88,23 +86,13 @@ class Trainer:
         for step, batch in enumerate(tqdm(train_loader)):
             self._run_batch(batch)
 
-    def run(self, train_dataset, eval_dataset):
-        # Create the DataLoaders
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size = self.batch_size,
-            sampler=DistributedSampler(train_dataset),
-            collate_fn=lambda x: {
-                "input_ids": torch.stack([sample["input_ids"].to(self.gpu_id) for sample in x]),
-                "attention_mask": torch.stack([sample["attention_mask"].to(self.gpu_id) for sample in x]),
-                "labels": torch.stack([sample["labels"].to(self.gpu_id) for sample in x]),
-            })
+    def run(self, eval_dataset):
+        
         
         total_loss = 0
         for epoch in range(self.num_epochs):
             self.model.train()
-            self._run_epoch(train_loader, epoch)
-                
+            self._run_epoch(self.data_trainloader, epoch)
             print(f"Epoch {epoch + 1}, train total loss: {total_loss}")
 
             # TODO
@@ -248,13 +236,26 @@ if __name__ == "__main__":
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
     
+
+    # Create the DataLoaders
+    data_trainloader = DataLoader(
+        train_dataset,
+        batch_size = batch_size,
+        sampler=DistributedSampler(train_dataset),
+        collate_fn=lambda x: {
+            "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
+            "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
+            "labels": torch.stack([sample["labels"].to(local_rank) for sample in x]),
+        })
+    
     # prepare trainer
     trainer = Trainer(
         model = model, 
         num_epochs = num_epochs,
         max_length = max_length,
         batch_size = batch_size,
-        gpu_id=local_rank
+        gpu_id=local_rank,
+        data_trainloader = data_trainloader
         )
     
     # execute trainer 
