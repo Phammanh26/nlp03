@@ -223,15 +223,15 @@ def load_pretrained_model():
 
 
 if __name__ == "__main__":
-    DEBUG = True
+    DEBUG = False
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     data_path = 'alpaca_data.json'
     output_dir = 'checkpoints/'
     size_valid_set = 0.1
-    max_length = 128
-    num_epochs = 30
-    batch_size = 16
+    max_length = 512
+    num_epochs = 100
+    batch_size = 4
     gradient_accumulation_steps = 8
 
     learning_rate = 1e-5
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     seed = 0
     log_freq = 1
     eval_freq = 150
-    data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
+    data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
     
     logger = get_logger()
 
