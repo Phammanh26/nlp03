@@ -62,9 +62,9 @@ class Trainer:
         self.max_length = max_length
         self.batch_size = batch_size
         self.gpu_id = gpu_id
-
+        ddp_local_rank = int(os.environ['LOCAL_RANK'])
         model = model.to(self.gpu_id)
-        self.model = DDP(model, device_ids=[self.gpu_id])
+        self.model = DDP(model, device_ids=[self.gpu_id], output_device=ddp_local_rank)
 
     # def wrap_mdoel_by_ddp(self):
     #     self.gpu_id = int(os.environ["LOCAL_RANK"])
@@ -231,14 +231,11 @@ def main():
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     
     ddp_setup()
-
     local_rank =  int(os.environ["LOCAL_RANK"])
     device = f"cuda:{local_rank}"
     # Download data
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
-    
-    
     
     # prepare trainer
     trainer = Trainer(
