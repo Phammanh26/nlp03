@@ -83,6 +83,8 @@ class Trainer:
         
         train_loader.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
+
+            check_input_device(batch, self.gpu_id)
             batch = {k: v.to(self.gpu_id) for k, v in batch.items()}
             self._run_batch(batch)
 
@@ -196,6 +198,14 @@ def load_tokenizer_from_pretrained_model(model_path):
     return tokenizer
 
 
+def check_input_device(batch, gpu_id):
+    for key, value in batch.items():
+        if isinstance(value, torch.Tensor):
+            if value.dim() > 0:
+                for i in range(value.size(0)):
+                    print(f"GPU_{gpu_id} | {key}[{i}]: {value[i].device}")
+            else:
+                print(f"GPU_{gpu_id} | {key}: {value.device}")
 
 def load_pretrained_model():
     model = AutoModelForCausalLM.from_pretrained(
