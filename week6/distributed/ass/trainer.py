@@ -56,6 +56,7 @@ class Trainer:
             
             ):
         
+        
         self.num_epochs = num_epochs
         self.max_length = max_length
         self.batch_size = batch_size
@@ -189,6 +190,7 @@ def load_pretrained_model():
         device_map={"": Accelerator().process_index},
     )
     model = prepare_model_for_int8_training(model)
+
     lora_config = LoraConfig(
         r=16,
         lora_alpha=32,
