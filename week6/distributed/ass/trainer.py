@@ -53,8 +53,7 @@ class Trainer:
             batch_size,
             ):
         
-        # setup the model
-        self.model = model
+       
         # setup the optimizer
         self.optimizer = optimizer
 
@@ -62,7 +61,9 @@ class Trainer:
         self.max_length = max_length
         self.batch_size = batch_size
         self.gpu_id = f'cuda:{int(os.environ["LOCAL_RANK"])}'
-        self.model = DDP(self.model)
+
+        model.to(self.gpu_id)
+        self.model = DDP(model, device_ids=[self.gpu_id])
 
     # def wrap_mdoel_by_ddp(self):
     #     self.gpu_id = int(os.environ["LOCAL_RANK"])
@@ -266,7 +267,6 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=eval_dataset
     )
-    
 
 
     destroy_process_group()
