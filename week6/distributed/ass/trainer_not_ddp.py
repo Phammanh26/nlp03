@@ -114,6 +114,7 @@ class Trainer:
         data_trainloader = DataLoader(
             train_dataset,
             batch_size=self.batch_size,
+            shuffle=False,
             sampler=DistributedSampler(train_dataset) if self.is_ddp_training else None,
             collate_fn=lambda x: {
                 "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
