@@ -218,6 +218,9 @@ def load_pretrained_model():
 
 
 def main():
+
+    # Get tokenizer
+    tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
     # Prepare dataset
     train_dataset, eval_dataset = create_datasets(tokenizer = tokenizer, max_length=max_length)
 
@@ -235,8 +238,7 @@ def main():
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
     
-    # Get tokenizer
-    tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
+    
     
     # prepare trainer
     trainer = Trainer(
