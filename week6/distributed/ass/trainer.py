@@ -62,9 +62,8 @@ class Trainer:
         self.max_length = max_length
         self.batch_size = batch_size
         self.gpu_id = gpu_id
-        ddp_local_rank = int(os.environ['LOCAL_RANK'])
         model = model.to(self.gpu_id)
-        self.model = DDP(model, device_ids=[self.gpu_id], output_device=ddp_local_rank)
+        self.model = DDP(model, device_ids=[self.gpu_id], output_device=self.gpu_id)
 
     # def wrap_mdoel_by_ddp(self):
     #     self.gpu_id = int(os.environ["LOCAL_RANK"])
@@ -120,9 +119,9 @@ def create_datasets(tokenizer, max_length):
             truncation=True,
             max_length=max_length,
             padding="max_length",
-            return_tensors=None,
+            return_tensors="pt",
         )
-        
+
         if (
             result["input_ids"][-1] != tokenizer.eos_token_id
             and len(result["input_ids"]) < max_length
@@ -232,7 +231,6 @@ def main():
     
     ddp_setup()
     local_rank =  int(os.environ["LOCAL_RANK"])
-    device = f"cuda:{local_rank}"
     # Download data
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
@@ -244,7 +242,7 @@ def main():
         num_epochs = num_epochs,
         max_length = max_length,
         batch_size = batch_size,
-        gpu_id=device
+        gpu_id=local_rank
         )
     # trainer.wrap_mdoel_by_ddp()
     
