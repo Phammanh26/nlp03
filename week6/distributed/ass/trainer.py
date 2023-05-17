@@ -70,6 +70,7 @@ class Trainer:
     #     self.model = DDP(self.model)
 
     def _run_batch(self,batch):
+        check_input_device(batch, self.gpu_id)
         outputs = self.model(**batch) 
         self.optimizer.zero_grad()
         loss = outputs.loss
@@ -83,9 +84,8 @@ class Trainer:
         
         train_loader.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
-
-            check_input_device(batch, self.gpu_id)
             batch = {k: v.to(self.gpu_id) for k, v in batch.items()}
+            
             self._run_batch(batch)
 
     def run(self, train_dataset, eval_dataset):
