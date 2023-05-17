@@ -260,7 +260,6 @@ if __name__ == "__main__":
     
     # execute trainer 
     trainer.run(
-        train_dataset=train_dataset,
         eval_dataset=eval_dataset
     )
 
