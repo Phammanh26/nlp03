@@ -145,9 +145,9 @@ class Trainer:
             
             # Evaluate after epoch
             self.model.eval()
-            self._eval(eval_loader = data_testloader)
+            eval_loss = self._eval(eval_loader = data_testloader)
             
-            print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {}")
+            print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
 
         print(f"Completed training | avg train loss = {avg_train_loss/self.num_epochs}")
 
