@@ -221,7 +221,7 @@ def load_pretrained_model():
         trust_remote_code=True,
         load_in_8bit=True,
         torch_dtype=torch.float16,
-        device_map={"": torch.cuda.current_device()},
+        device_map={"": Accelerator().process_index},
     )
     model = prepare_model_for_int8_training(model)
 
@@ -277,6 +277,7 @@ if __name__ == "__main__":
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
     
+    print(f"DEBUG device { Accelerator().process_index} | { torch.cuda.current_device()}")
     # Prepare model
     model = load_pretrained_model()
     
