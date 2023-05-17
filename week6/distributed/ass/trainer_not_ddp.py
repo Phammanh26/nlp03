@@ -24,7 +24,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class Trainer:
-    def __init__( self, model, tokenizer, gpu_id: int, is_ddp_trained: bool,  num_epochs: int = 10,max_length: int = 128, batch_size: int = 8 ):
+    def __init__( self, model, tokenizer, gpu_id: int, is_ddp_training: bool,  num_epochs: int = 10,max_length: int = 128, batch_size: int = 8 ):
         """
         Initialize the Trainer class.
 
@@ -42,14 +42,14 @@ class Trainer:
         self.max_length = max_length
         self.batch_size = batch_size
         self.gpu_id = gpu_id
-        self.is_ddp_trained = is_ddp_trained
+        self.is_ddp_training = is_ddp_training
     
         self.tokenizer = tokenizer
         self.model = model.to(f"cuda:{self.gpu_id}")
         # Setup the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         
-        if is_ddp_trained:
+        if is_ddp_training:
             self.set_ddp_training()
 
     
@@ -109,7 +109,7 @@ class Trainer:
         data_trainloader = DataLoader(
             train_dataset,
             batch_size=self.batch_size,
-            sampler=DistributedSampler(train_dataset) if self.is_ddp_trained else None,
+            sampler=DistributedSampler(train_dataset) if self.is_ddp_training else None,
             collate_fn=lambda x: {
                 "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
                 "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
@@ -256,9 +256,9 @@ if __name__ == "__main__":
     data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
     
     logger = get_logger()
-    is_ddp_trained = True
+    is_ddp_training = True
     
-    if is_ddp_trained:
+    if is_ddp_training:
         init_process_group(backend=backend)
 
     if DEBUG == False:
@@ -279,7 +279,8 @@ if __name__ == "__main__":
         max_length = max_length,
         batch_size = batch_size,
         gpu_id=local_rank,
-        tokenizer=tokenizer)
+        tokenizer=tokenizer,
+        is_ddp_training = is_ddp_training)
     
     # set ddp for wraping model
     trainer.set_ddp()
@@ -289,5 +290,5 @@ if __name__ == "__main__":
         size_valid_set = size_valid_set,
         seed =seed
     )
-    if is_ddp_trained:
+    if is_ddp_training:
         destroy_process_group()
