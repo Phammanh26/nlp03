@@ -28,7 +28,7 @@ output_dir = 'checkpoints/'
 size_valid_set = 0.1
 max_length = 256
 num_epochs = 3
-batch_size = 8
+batch_size = 4
 gradient_accumulation_steps = 8
 
 
@@ -122,8 +122,6 @@ def create_datasets(tokenizer, max_length, gpu_id):
             result["attention_mask"].append(1)
 
         result["labels"] = result["input_ids"].copy()
-
-        
         return result
     
     def generate_and_tokenize_prompt(data_point):
@@ -197,7 +195,7 @@ def load_pretrained_model():
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         trust_remote_code=True,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float16
     )
     model = prepare_model_for_int8_training(model)
 
@@ -226,6 +224,7 @@ if __name__ == "__main__":
         tokenizer = tokenizer, 
         max_length=max_length,
         gpu_id = local_rank)
+    
     # Prepare model
     model = load_pretrained_model()
     
