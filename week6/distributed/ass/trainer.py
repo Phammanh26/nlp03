@@ -84,8 +84,8 @@ class Trainer:
         self.optimizer.step()
 
     def _run_epoch(self,train_loader, epoch):
-        print(f"[GPU{self.gpu_id}] | Epoch {epoch} | Steps: {len(train_loader)}")
-        print(f"device model's is: {next(self.model.parameters()).device}")
+        print(f"\n [GPU{self.gpu_id}] | Epoch {epoch} | Steps: {len(train_loader)}")
+        print(f"\n device model's is: {next(self.model.parameters()).device}")
         
         train_loader.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
