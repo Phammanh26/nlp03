@@ -112,7 +112,7 @@ class Trainer:
             #     collate_fn=default_data_collator)
 
 
-def create_datasets(tokenizer, max_length):
+def create_datasets(tokenizer, max_length, gpu_id):
     def tokenize(prompt, add_eos_token=True):
         result = tokenizer(
             prompt,
@@ -146,7 +146,7 @@ def create_datasets(tokenizer, max_length):
         # Chuyển đổi thiết bị của các tensors trong `tokenized_full_prompt`
         for key, value in tokenized_full_prompt.items():
             if isinstance(value, torch.Tensor):
-                tokenized_full_prompt[key] = value.to(self.gpu_id)
+                tokenized_full_prompt[key] = value.to(gpu_id)
 
         return tokenized_full_prompt
     
@@ -223,10 +223,15 @@ def load_pretrained_model():
 if __name__ == "__main__":
 
     ddp_setup()
+
+    local_rank =  int(os.environ["LOCAL_RANK"])
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
     # Prepare dataset
-    train_dataset, eval_dataset = create_datasets(tokenizer = tokenizer, max_length=max_length)
+    train_dataset, eval_dataset = create_datasets(
+        tokenizer = tokenizer, 
+        max_length=max_length,
+        gpu_id = local_rank)
     # Prepare model
     model = load_pretrained_model()
     # Prepare optimizer
@@ -235,7 +240,7 @@ if __name__ == "__main__":
     # Download data
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
-    local_rank =  int(os.environ["LOCAL_RANK"])
+    
     # prepare trainer
     trainer = Trainer(
         model = model, 
