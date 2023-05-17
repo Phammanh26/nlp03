@@ -47,7 +47,6 @@ class Trainer:
     def __init__(
             self,
             model, 
-            optimizer,
             num_epochs,
             max_length,
             batch_size,
@@ -55,8 +54,7 @@ class Trainer:
             ):
         
        
-        # setup the optimizer
-        self.optimizer = optimizer
+        
 
         self.num_epochs = num_epochs
         self.max_length = max_length
@@ -64,6 +62,9 @@ class Trainer:
         self.gpu_id = gpu_id
         
         self.model = model.to(self.gpu_id)
+
+        # setup the optimizer
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
 
     # def wrap_mdoel_by_ddp(self):
@@ -247,8 +248,7 @@ if __name__ == "__main__":
         gpu_id = local_rank)
     # Prepare model
     model = load_pretrained_model()
-    # Prepare optimizer
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    
     
     # Download data
     data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
@@ -257,7 +257,6 @@ if __name__ == "__main__":
     # prepare trainer
     trainer = Trainer(
         model = model, 
-        optimizer = optimizer,
         num_epochs = num_epochs,
         max_length = max_length,
         batch_size = batch_size,
