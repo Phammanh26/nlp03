@@ -234,7 +234,7 @@ def main():
     local_rank =  int(os.environ["LOCAL_RANK"])
     device = f"cuda:{local_rank}"
     # Download data
-    data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
+    data_driver_path = 'https://drive.google.com/file/d/1TIdshkGnECTS1ADX39dXcevQDIqFCNtz/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
     
     # Get tokenizer
