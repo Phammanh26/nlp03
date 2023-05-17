@@ -60,9 +60,8 @@ class Trainer:
         self.max_length = max_length
         self.batch_size = batch_size
         self.gpu_id = gpu_id
-        
-        self.model = model.to(self.gpu_id)
 
+        self.model = model.to(f"cuda:{self.gpu_id}")
         # setup the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
@@ -87,28 +86,23 @@ class Trainer:
         
         train_loader.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
-            batch = {k: v.to(self.gpu_id) for k, v in batch.items()}
-
             self._run_batch(batch)
 
     def run(self, train_dataset, eval_dataset):
-        model = self.model
-        
         # Create the DataLoaders
         train_loader = DataLoader(
             train_dataset,
             batch_size = self.batch_size,
             sampler=DistributedSampler(train_dataset),
             collate_fn=lambda x: {
-                "input_ids": torch.stack([sample["input_ids"] for sample in x]),
-                "attention_mask": torch.stack([sample["attention_mask"] for sample in x]),
-                "labels": torch.stack([sample["labels"] for sample in x]),
+                "input_ids": torch.stack([sample["input_ids"].to(self.gpu_id) for sample in x]),
+                "attention_mask": torch.stack([sample["attention_mask"].to(self.gpu_id) for sample in x]),
+                "labels": torch.stack([sample["labels"].to(self.gpu_id) for sample in x]),
             })
         
         total_loss = 0
-
         for epoch in range(self.num_epochs):
-            model.train()
+            self.model.train()
             self._run_epoch(train_loader, epoch)
                 
             print(f"Epoch {epoch + 1}, train total loss: {total_loss}")
