@@ -77,10 +77,6 @@ class Trainer:
         return loss.item()
 
     def _run_epoch(self,train_loader, epoch):
-        
-        print(f"\n [GPU{self.gpu_id}] | Epoch {epoch} | Steps: {len(train_loader)}")
-        print(f"\n device model's is: {next(self.model.parameters()).device}")
-        
         epoch_loss = 0
         train_loader.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
