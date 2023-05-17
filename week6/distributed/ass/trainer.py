@@ -19,7 +19,8 @@ from torch.utils.data.distributed import DistributedSampler
 from utils.common import download_from_driver
 from utils.logger_utils import get_logger
 from prepare_dataset import create_datasets
-
+import warnings
+warnings.filterwarnings('ignore')
 
 class Trainer:
     def __init__( self, model, tokenizer, gpu_id: int,  num_epochs: int = 10,max_length: int = 128, batch_size: int = 8 ):
@@ -77,15 +78,26 @@ class Trainer:
         Returns:
             Total loss value for the epoch.
         """
-        self.logger.info(f"Start to train epoch: {epoch}")
+        
         epoch_loss = 0
         train_loader.sampler.set_epoch(epoch)
+        
         for step, batch in enumerate(tqdm(train_loader)):
             loss = self._run_batch(batch)
             epoch_loss += loss
-        self.logger.info(f"Completed training epoch: {epoch} | train loss = {epoch_loss}")
+        
         return epoch_loss
 
+    def _eval(self, eval_loader):
+        # TODO: Evaluation
+        avg_loss = 0
+        model.eval()
+        for step, batch in enumerate(tqdm(eval_loader)):
+            outputs = self.model(**batch) 
+            avg_loss += outputs.loss
+        avg_loss = avg_loss/(step+1)
+        return avg_loss
+    
     def run(self, data_path: str, size_valid_set: int = 0.25, seed:int=123):
         """
         Run the training process.
@@ -112,32 +124,46 @@ class Trainer:
                 "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
                 "labels": torch.stack([sample["labels"].to(local_rank) for sample in x]),
             })
-    
-        avg_loss = 0
-        self.logger.info(f"Start training | total epochs: {self.num_epochs}")
+
+        # Create the DataLoaders
+        data_testloader = DataLoader(
+            eval_dataset,
+            batch_size=self.batch_size,
+            sampler=DistributedSampler(train_dataset),
+            collate_fn=lambda x: {
+                "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
+                "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
+                "labels": torch.stack([sample["labels"].to(local_rank) for sample in x]),
+            })
+        
+        avg_train_loss = 0
+        print(f"Start training | total epochs: {self.num_epochs}")
         for epoch in range(self.num_epochs):
             self.model.train()
-            epoch_loss = self._run_epoch(data_trainloader, epoch)
-            avg_loss += epoch_loss
-        self.logger.info(f"Completed training | avg train loss = {avg_loss/self.num_epochs}")
+            train_loss = self._run_epoch(data_trainloader, epoch)
+            avg_train_loss += train_loss
+            
+            # Evaluate after epoch
+            self.model.eval()
+            self._eval(eval_loader = data_testloader)
+            
+            print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {}")
 
-        # TODO: Evaluation
-        # eval_loader = DataLoader(
-        #     eval_dataset,
-        #     batch_size=self.batch_size,
-        #     collate_fn=default
+        print(f"Completed training | avg train loss = {avg_train_loss/self.num_epochs}")
+
+       
 
 
 def load_tokenizer_from_pretrained_model(model_path):
-    logger.info('Loading config....')
+    print('Loading config....')
     config = AutoConfig.from_pretrained(model_path)
     architecture = config.architectures[0]
-    logger.info('Loading tokenizer.....')
+    print('Loading tokenizer.....')
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    logger.info('Completed to load config & tokenizer')
+    print('Completed to load config & tokenizer')
 
     if "Llama" in architecture:
-        logger.info("Setting EOS, BOS, UNK, and PAD tokens for LLama tokenizer")
+        print("Setting EOS, BOS, UNK, and PAD tokens for LLama tokenizer")
         tokenizer.add_special_tokens(
             {
                 "eos_token": "</s>",
