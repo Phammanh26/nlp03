@@ -46,7 +46,7 @@ class Trainer:
         self.model = model.to(f"cuda:{self.gpu_id}")
         # Setup the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
-        self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
+        self.model = model
 
     
     def _run_batch(self, batch):
@@ -223,7 +223,7 @@ if __name__ == "__main__":
 
     logger = get_logger()
 
-    init_process_group(backend=backend)
+    # init_process_group(backend=backend)
     # Download data
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
 
@@ -250,4 +250,4 @@ if __name__ == "__main__":
         seed =seed
     )
 
-    destroy_process_group()
+    # destroy_process_group()
