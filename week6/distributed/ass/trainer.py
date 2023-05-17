@@ -1,6 +1,5 @@
 import os
 import torch
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
@@ -14,7 +13,9 @@ from transformers import (
   )
 
 from accelerate import Accelerator
-from torch.utils.data.distributed import DistributedSampler, SequentialSampler
+from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader, SequentialSampler
+
 
 from utils.common import download_from_driver
 from utils.logger_utils import get_logger
