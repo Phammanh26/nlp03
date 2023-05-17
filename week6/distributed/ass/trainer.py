@@ -98,7 +98,11 @@ class Trainer:
             train_dataset,
             batch_size = self.batch_size,
             sampler=DistributedSampler(train_dataset),
-            collate_fn=default_data_collator)
+            collate_fn=lambda x: {
+        "input_ids": torch.stack([sample["input_ids"] for sample in x]),
+        "attention_mask": torch.stack([sample["attention_mask"] for sample in x]),
+        "labels": torch.stack([sample["labels"] for sample in x]),
+    },)
         
         total_loss = 0
 
