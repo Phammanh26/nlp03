@@ -51,6 +51,7 @@ class Trainer:
             num_epochs,
             max_length,
             batch_size,
+            gpu_id
             ):
         
        
@@ -60,7 +61,7 @@ class Trainer:
         self.num_epochs = num_epochs
         self.max_length = max_length
         self.batch_size = batch_size
-        self.gpu_id = int(os.environ["LOCAL_RANK"])
+        self.gpu_id = gpu_id
 
         model.to(self.gpu_id)
         self.model = DDP(model, device_ids=[self.gpu_id])
@@ -209,7 +210,7 @@ def load_tokenizer_from_pretrained_model(model_path):
 
 
 
-def load_pretrained_model():
+def load_pretrained_model(device):
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         trust_remote_code=True,
@@ -226,6 +227,8 @@ def load_pretrained_model():
         task_type="CAUSAL_LM",
     )
 
+    model.to(device)
+
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
@@ -236,7 +239,9 @@ def load_pretrained_model():
 def main():
     ddp_setup()
 
-     # Download data
+    local_rank =  int(os.environ["LOCAL_RANK"])
+    device = f"cuda:{local_rank}"
+    # Download data
     data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
     download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
     
@@ -246,7 +251,7 @@ def main():
     train_dataset, eval_dataset = create_datasets(tokenizer = tokenizer, max_length=max_length)
 
     # Prepare model
-    model = load_pretrained_model()
+    model = load_pretrained_model(device)
 
     # Prepare optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
@@ -258,6 +263,7 @@ def main():
         num_epochs = num_epochs,
         max_length = max_length,
         batch_size = batch_size,
+        gpu_id=device
         )
     # trainer.wrap_mdoel_by_ddp()
     
