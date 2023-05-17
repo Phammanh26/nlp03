@@ -19,6 +19,8 @@ from transformers import (
     AutoTokenizer, 
     default_data_collator
   )
+
+from accelerate import Accelerator
 from torch.utils.data.distributed import DistributedSampler
 
 
@@ -188,7 +190,9 @@ def load_pretrained_model():
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         trust_remote_code=True,
-        torch_dtype=torch.float16
+        load_in_8bit=True,
+        torch_dtype=torch.float16,
+        device_map={"": Accelerator().process_index},
     )
     model = prepare_model_for_int8_training(model)
 
