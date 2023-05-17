@@ -233,7 +233,7 @@ def load_pretrained_model():
 
 
 if __name__ == "__main__":
-    DEBUG = False
+    DEBUG = True
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     data_path = 'alpaca_data.json'
