@@ -161,8 +161,8 @@ def create_datasets(tokenizer, max_length):
 
 
 def ddp_setup():
-    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
     init_process_group(backend="nccl")
+    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
     
 
 
