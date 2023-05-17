@@ -83,8 +83,7 @@ class Trainer:
         self.optimizer.step()
 
     def _run_epoch(self,train_loader, epoch):
-        b_sz = len(next(iter(train_loader))[0])
-        print(f"[GPU{self.gpu_id}] Epoch {epoch} | Batchsize: {b_sz} | Steps: {len(self.train_data)}")
+        print(f"[GPU{self.gpu_id}] Epoch {epoch} | Steps: {len(self.train_data)}")
         self.train_data.sampler.set_epoch(epoch)
         for step, batch in enumerate(tqdm(train_loader)):
             input_ids = batch["input_ids"].to(self.gpu_id)
