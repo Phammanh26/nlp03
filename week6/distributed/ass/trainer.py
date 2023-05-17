@@ -218,6 +218,9 @@ def load_pretrained_model():
 
 
 def main():
+    # Prepare dataset
+    train_dataset, eval_dataset = create_datasets(tokenizer = tokenizer, max_length=max_length)
+
     # Prepare model
     model = load_pretrained_model()
 
@@ -234,8 +237,6 @@ def main():
     
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
-    # Prepare dataset
-    train_dataset, eval_dataset = create_datasets(tokenizer = tokenizer, max_length=max_length)
     
     # prepare trainer
     trainer = Trainer(
