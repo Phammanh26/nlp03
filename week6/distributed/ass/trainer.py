@@ -71,6 +71,7 @@ class Trainer:
     #     self.model = DDP(self.model)
 
     def _run_batch(self, input_ids, attention_masks, labels):
+        
         outputs = self.model(
             input_ids = input_ids,  
             attention_mask=attention_masks, 
@@ -85,7 +86,7 @@ class Trainer:
         b_sz = len(next(iter(train_loader))[0])
         print(f"[GPU{self.gpu_id}] Epoch {epoch} | Batchsize: {b_sz} | Steps: {len(self.train_data)}")
         self.train_data.sampler.set_epoch(epoch)
-        for batch in train_loader:
+        for step, batch in enumerate(tqdm(train_loader)):
             input_ids = batch["input_ids"].to(self.gpu_id)
             attention_masks = batch["attention_mask"].to(self.gpu_id)
             labels = batch["labels"].to(self.gpu_id)
@@ -106,20 +107,8 @@ class Trainer:
 
         for epoch in range(self.num_epochs):
             model.train()
-            for step, batch in enumerate(tqdm(train_loader)):
-                input_ids = batch["input_ids"].to(self.gpu_id)
-                attention_masks = batch["attention_mask"].to(self.gpu_id)
-                labels = batch["labels"].to(self.gpu_id)
+            self._run_epoch(train_loader, epoch)
                 
-                outputs = model(input_ids = input_ids,  attention_mask=attention_masks, labels = labels)
-                
-                self.optimizer.zero_grad()
-
-                loss = outputs.loss
-                total_loss += loss.detach().float()
-                loss.backward()
-                self.optimizer.step()
-            
             print(f"Epoch {epoch + 1}, train total loss: {total_loss}")
 
             # TODO
