@@ -28,7 +28,7 @@ output_dir = 'checkpoints/'
 size_valid_set = 0.1
 max_length = 256
 num_epochs = 3
-batch_size = 4
+batch_size = 8
 gradient_accumulation_steps = 8
 
 
