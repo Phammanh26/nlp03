@@ -256,7 +256,7 @@ if __name__ == "__main__":
     data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
     
     logger = get_logger()
-    is_ddp_training = True
+    is_ddp_training = False
     
     if is_ddp_training:
         init_process_group(backend=backend)
