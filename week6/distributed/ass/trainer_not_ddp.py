@@ -217,7 +217,7 @@ def load_pretrained_model():
         trust_remote_code=True,
         load_in_8bit=True,
         torch_dtype=torch.float16,
-        device_map={"": Accelerator().process_index},
+        device_map={"": torch.cuda.current_device()},
     )
     model = prepare_model_for_int8_training(model)
 
@@ -261,12 +261,15 @@ if __name__ == "__main__":
     
     if is_ddp_training:
         init_process_group(backend=backend)
+        local_rank =  int(os.environ["LOCAL_RANK"])
+    else:
+        local_rank = 0
 
     if DEBUG == False:
         # Download data
         download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
 
-    local_rank =  int(os.environ["LOCAL_RANK"])
+    
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
     
