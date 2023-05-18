@@ -99,6 +99,7 @@ class Trainer:
             train_progress_bar = train_dataloader
         
         for step, batch in enumerate(tqdm(train_progress_bar)):
+            batch = {key: value.to(self.gpu_id) for key, value in batch.items()}
             batch.to(self.gpu_id)
             print(f"\nEpoch [{epoch}] | Batch [{step}] | on GPU [{self.gpu_id}]")
             loss = self._run_batch(batch)
