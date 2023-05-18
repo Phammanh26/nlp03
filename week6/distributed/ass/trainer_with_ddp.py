@@ -48,8 +48,6 @@ class Trainer:
         self.model = model.to(f"cuda:{self.gpu_id}")
         
 
-
-    
     def set_ddp_training(self):
         self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
     
@@ -306,3 +304,10 @@ if __name__ == "__main__":
     )
     if is_ddp_training:
         destroy_process_group()
+
+
+
+
+
+
+
