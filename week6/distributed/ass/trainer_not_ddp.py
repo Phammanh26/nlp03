@@ -114,7 +114,8 @@ class Trainer:
             train_dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            sampler=DistributedSampler(train_dataset, rank=self.gpu_id, pin_memory=True) if self.is_ddp_training else None,
+            pin_memory=True
+            sampler=DistributedSampler(train_dataset, rank=self.gpu_id) if self.is_ddp_training else None,
             collate_fn=lambda x: {
                 "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
                 "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
