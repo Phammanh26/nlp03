@@ -114,7 +114,7 @@ class Trainer:
             train_dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            sampler=DistributedSampler(train_dataset, rank=self.gpu_id) if self.is_ddp_training else None,
+            sampler=DistributedSampler(train_dataset, rank=self.gpu_id, pin_memory=True) if self.is_ddp_training else None,
             collate_fn=lambda x: {
                 "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
                 "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
@@ -267,6 +267,7 @@ if __name__ == "__main__":
     if is_ddp_training:
         init_process_group(backend=backend)
         local_rank =  int(os.environ["LOCAL_RANK"])
+        torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
     else:
         local_rank = 0
 
