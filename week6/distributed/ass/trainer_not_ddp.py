@@ -46,11 +46,8 @@ class Trainer:
     
         self.tokenizer = tokenizer
         self.model = model.to(f"cuda:{self.gpu_id}")
-        # Setup the optimizer
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         
-        if is_ddp_training:
-            self.set_ddp_training()
+
 
     
     def set_ddp_training(self):
@@ -169,6 +166,12 @@ class Trainer:
         
         train_dataloader, eval_dataloader = self.prepare_dataloader(train_dataset, eval_dataset)
         
+        if self.is_ddp_training:
+            self.set_ddp_training()
+
+        # Setup the optimizer
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
+
         avg_train_loss = 0
         if self.is_master_process():
             print(f"Start training | total epochs: {self.num_epochs}")
@@ -274,7 +277,6 @@ if __name__ == "__main__":
     if DEBUG == False:
         # Download data
         download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
-
     
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
