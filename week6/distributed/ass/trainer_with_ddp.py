@@ -51,7 +51,7 @@ class Trainer:
     def set_ddp_training(self):
         self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
     
-    def is_master_process(self):
+    def _is_master_process(self):
         if is_ddp_training:
             ddp_rank = int(os.environ['RANK'])
         else:
@@ -91,7 +91,7 @@ class Trainer:
         epoch_loss = 0
         self.model.train()
         
-        if self.is_master_process():
+        if self._is_master_process():
             train_progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1} [Training]", position=0, leave=False)
         else:
             train_progress_bar = train_dataloader
@@ -104,6 +104,12 @@ class Trainer:
             epoch_loss += loss
         
         return epoch_loss
+    
+    def _save_checkpoint(self, epoch):
+        ckp = self.model.module.state_dict()
+        PATH = f"epoch_{epoch}_checkpoint.pt"
+        torch.save(ckp, PATH)
+        print(f"Epoch {epoch} | Training checkpoint saved at {PATH}")
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
         # Create the DataLoaders
@@ -135,7 +141,7 @@ class Trainer:
         # TODO: Evaluation
         avg_loss = 0
         model.eval()
-        if self.is_master_process():
+        if self._is_master_process():
             eval_progress_bar = tqdm(eval_dataloader, desc=f"Epoch {epoch + 1} [Evaluation]", position=0, leave=False)
         else:
             eval_progress_bar = eval_dataloader
@@ -173,7 +179,7 @@ class Trainer:
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
 
         avg_train_loss = 0
-        if self.is_master_process():
+        if self._is_master_process():
             print(f"Start training | total epochs: {self.num_epochs}")
         
         for epoch in range(self.num_epochs):
@@ -185,13 +191,12 @@ class Trainer:
             # Evaluate after each epoch
             eval_loss = self._eval(eval_dataloader = eval_dataloader, epoch = epoch)
             
-            if self.is_master_process():
-                print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
+            # Save checkpoint
+            if self._is_master_process():
+                self._save_checkpoint(epoch = epoch)
+            
+            print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
 
-
-
-        if self.is_master_process():
-            print(f"Completed training | avg train loss = {avg_train_loss/self.num_epochs}")
 
        
 
