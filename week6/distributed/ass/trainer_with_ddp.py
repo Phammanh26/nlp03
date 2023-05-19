@@ -116,8 +116,9 @@ class Trainer:
             os.makedirs(path_dir)
 
         # save checkpoints
-        self.model.module.save_pretrained(path_dir)
-        print(f"Epoch {epoch} | Training checkpoint saved at {path_dir}")
+        torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
+
+        print(f"\nEpoch {epoch} | Training checkpoint saved at {path_dir}")
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
         # Create the DataLoaders
@@ -188,7 +189,7 @@ class Trainer:
 
         avg_train_loss = 0
         if self._is_master_process():
-            print(f"Start training | total epochs: {self.num_epochs}")
+            print(f"\nStart training | total epochs: {self.num_epochs}")
         
         for epoch in range(self.num_epochs):
             if self.is_ddp_training:
@@ -203,7 +204,7 @@ class Trainer:
             if self._is_master_process():
                 self._save_checkpoint(epoch = epoch)
             
-            print(f"Completed training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
+            print(f"\nCompleted training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
 
 
        
@@ -287,7 +288,7 @@ if __name__ == "__main__":
         init_process_group(backend=backend)
         local_rank =  int(os.environ["LOCAL_RANK"])
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
-        print(f"current_device = { torch.cuda.current_device()} | local_rank = {local_rank}")
+        print(f"\ncurrent_device = { torch.cuda.current_device()} | local_rank = {local_rank}")
     else:
         local_rank = 0
 
