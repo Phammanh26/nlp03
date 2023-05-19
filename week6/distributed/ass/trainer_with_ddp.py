@@ -279,16 +279,9 @@ if __name__ == "__main__":
     log_freq = 1
     eval_freq = 150
     
-    
     if DEBUG == False:
         # Download data
         download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
-    
-    # Get tokenizer
-    tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
-    
-    
-
     
     if USE_DDP_TRAINING:
         init_process_group(backend=backend)
@@ -300,7 +293,9 @@ if __name__ == "__main__":
 
     # Prepare model
     model = load_pretrained_model()
-    
+    # Get tokenizer
+    tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
+
     # prepare trainer
     trainer = Trainer(
         model = model, 
