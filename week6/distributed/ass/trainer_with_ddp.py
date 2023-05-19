@@ -280,14 +280,6 @@ if __name__ == "__main__":
     eval_freq = 150
     
     
-    
-    if USE_DDP_TRAINING:
-        init_process_group(backend=backend)
-        local_rank =  int(os.environ["LOCAL_RANK"])
-        torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
-    else:
-        local_rank = 0
-
     if DEBUG == False:
         # Download data
         download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
@@ -295,9 +287,19 @@ if __name__ == "__main__":
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
     
-    print(f"DEBUG device Accelerator = { Accelerator().process_index} | current_device = { torch.cuda.current_device()} | local_rank = {local_rank}")
     # Prepare model
     model = load_pretrained_model()
+
+    
+    if USE_DDP_TRAINING:
+        init_process_group(backend=backend)
+        local_rank =  int(os.environ["LOCAL_RANK"])
+        torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
+        print(f"DEBUG device Accelerator = { Accelerator().process_index} | current_device = { torch.cuda.current_device()} | local_rank = {local_rank}")
+    else:
+        local_rank = 0
+
+    
     
     # prepare trainer
     trainer = Trainer(
