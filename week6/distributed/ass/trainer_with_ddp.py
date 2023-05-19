@@ -24,7 +24,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class Trainer:
-    def __init__( self, model, tokenizer, gpu_id: int, is_ddp_training: bool,  num_epochs: int = 10,max_length: int = 128, batch_size: int = 8 ):
+    def __init__( self, model, tokenizer, gpu_id: int, is_ddp_training: bool, output_dir: str = 'checkpoints/',  num_epochs: int = 10,max_length: int = 128, batch_size: int = 8 ):
         """
         Initialize the Trainer class.
 
@@ -43,7 +43,7 @@ class Trainer:
         self.batch_size = batch_size
         self.gpu_id = gpu_id
         self.is_ddp_training = is_ddp_training
-    
+        self.output_dir = output_dir
         self.tokenizer = tokenizer
         self.model = model.to(f"cuda:{self.gpu_id}")
         
@@ -108,7 +108,7 @@ class Trainer:
     def _save_checkpoint(self, epoch):
         ckp = self.model.module.state_dict()
 
-        path_dir = f"{OUTPUT_DIR}/epoch_{epoch}"
+        path_dir = f"{self.output_dir}/epoch_{epoch}"
         path = f"{path_dir}/checkpoint.pt"
         
         # check path_dir exited
@@ -307,6 +307,7 @@ if __name__ == "__main__":
         batch_size = batch_size,
         gpu_id=local_rank,
         tokenizer=tokenizer,
+        output_dir= OUTPUT_DIR,
         is_ddp_training = USE_DDP_TRAINING)
     
     # set ddp for wraping model
