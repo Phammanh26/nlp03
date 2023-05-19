@@ -248,6 +248,9 @@ def load_pretrained_model():
 
 if __name__ == "__main__":
     DEBUG = True
+    USE_DDP_TRAINING = True
+    data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
+    
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     data_path = 'alpaca_data.json'
@@ -267,12 +270,10 @@ if __name__ == "__main__":
     seed = 0
     log_freq = 1
     eval_freq = 150
-    data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
     
-    logger = get_logger()
-    is_ddp_training = True
     
-    if is_ddp_training:
+    
+    if USE_DDP_TRAINING:
         init_process_group(backend=backend)
         local_rank =  int(os.environ["LOCAL_RANK"])
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
@@ -298,7 +299,7 @@ if __name__ == "__main__":
         batch_size = batch_size,
         gpu_id=local_rank,
         tokenizer=tokenizer,
-        is_ddp_training = is_ddp_training)
+        is_ddp_training = USE_DDP_TRAINING)
     
     # set ddp for wraping model
     # execute trainer 
@@ -307,7 +308,7 @@ if __name__ == "__main__":
         size_valid_set = size_valid_set,
         seed =seed
     )
-    if is_ddp_training:
+    if USE_DDP_TRAINING:
         destroy_process_group()
 
 
