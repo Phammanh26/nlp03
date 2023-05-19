@@ -52,7 +52,7 @@ class Trainer:
         self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
     
     def _is_master_process(self):
-        if is_ddp_training:
+        if self.is_ddp_training:
             ddp_rank = int(os.environ['RANK'])
         else:
             ddp_rank = 0
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     DEBUG = True
     USE_DDP_TRAINING = True
     data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
-    
+
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     data_path = 'alpaca_data.json'
