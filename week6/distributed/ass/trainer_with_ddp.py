@@ -107,9 +107,17 @@ class Trainer:
     
     def _save_checkpoint(self, epoch):
         ckp = self.model.module.state_dict()
-        PATH = f"{CHECKPOINT_DIR}/epoch_{epoch}/checkpoint.pt"
-        torch.save(ckp, PATH)
-        print(f"Epoch {epoch} | Training checkpoint saved at {PATH}")
+
+        path_dir = f"{CHECKPOINT_DIR}/epoch_{epoch}"
+        path = f"path_dir/checkpoint.pt"
+        
+        # check path_dir exited
+        if not os.path.exists(path_dir):
+            os.makedirs(path_dir)
+
+        # save checkpoints
+        torch.save(ckp, path)
+        print(f"Epoch {epoch} | Training checkpoint saved at {path}")
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
         # Create the DataLoaders
