@@ -68,6 +68,8 @@ class Trainer:
         Returns:
             Loss value for the batch.
         """
+        
+        
         self.optimizer.zero_grad()
         outputs = self.model(**batch) 
         loss = outputs.loss
@@ -97,7 +99,9 @@ class Trainer:
             train_progress_bar = train_dataloader
         
         for step, batch in enumerate(tqdm(train_progress_bar)):
-       
+            if step == 0:
+                print(f"Batch shape: {batch.shape}")
+                
             batch = {key: value.to(self.gpu_id) for key, value in batch.items()}
             print(f"\nEpoch [{epoch}] | Batch [{step}] | on GPU [{self.gpu_id}]")
             loss = self._run_batch(batch)
@@ -145,9 +149,7 @@ class Trainer:
             })
         
 
-        print(f"Train dataloader shape: {data_trainloader.shape}")
-        print(f"Valid dataset shape: {data_testloader.shape}")
-        
+       
         return data_trainloader, data_testloader
     
     def _eval(self, eval_dataloader, epoch: int):
