@@ -109,7 +109,7 @@ class Trainer:
         ckp = self.model.module.state_dict()
 
         path_dir = f"{CHECKPOINT_DIR}/epoch_{epoch}"
-        path = f"path_dir/checkpoint.pt"
+        path = f"{path_dir}/checkpoint.pt"
         
         # check path_dir exited
         if not os.path.exists(path_dir):
