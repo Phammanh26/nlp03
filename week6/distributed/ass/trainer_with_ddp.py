@@ -100,8 +100,8 @@ class Trainer:
         
         for step, batch in enumerate(tqdm(train_progress_bar)):
             if step == 0:
-                print(f"Batch shape: {batch.shape}")
-                
+                print(f"Batch shape: {batch['input_ids'].shape}")
+
             batch = {key: value.to(self.gpu_id) for key, value in batch.items()}
             print(f"\nEpoch [{epoch}] | Batch [{step}] | on GPU [{self.gpu_id}]")
             loss = self._run_batch(batch)
