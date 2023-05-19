@@ -108,7 +108,7 @@ class Trainer:
     def _save_checkpoint(self, epoch):
         ckp = self.model.module.state_dict()
 
-        path_dir = f"{CHECKPOINT_DIR}/epoch_{epoch}"
+        path_dir = f"{OUTPUT_DIR}/epoch_{epoch}"
         path = f"{path_dir}/checkpoint.pt"
         
         # check path_dir exited
@@ -257,13 +257,12 @@ def load_pretrained_model():
 if __name__ == "__main__":
     DEBUG = True
     USE_DDP_TRAINING = True
-    CHECKPOINT_DIR = "/checkpoints"
-    data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
+    OUTPUT_DIR = "checkpoints/"
+    DRIVER_DATA_PATH = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
 
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     data_path = 'alpaca_data.json'
-    output_dir = 'checkpoints/'
     size_valid_set = 0.1
     max_length = 128
     num_epochs = 3
@@ -291,7 +290,7 @@ if __name__ == "__main__":
 
     if DEBUG == False:
         # Download data
-        download_from_driver(data_driver_path= data_driver_path, location_path= data_path)
+        download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
     
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
