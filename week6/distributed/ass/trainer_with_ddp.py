@@ -287,8 +287,7 @@ if __name__ == "__main__":
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
     
-    # Prepare model
-    model = load_pretrained_model()
+    
 
     
     if USE_DDP_TRAINING:
@@ -299,7 +298,8 @@ if __name__ == "__main__":
     else:
         local_rank = 0
 
-    
+    # Prepare model
+    model = load_pretrained_model()
     
     # prepare trainer
     trainer = Trainer(
