@@ -295,7 +295,7 @@ if __name__ == "__main__":
         init_process_group(backend=backend)
         local_rank =  int(os.environ["LOCAL_RANK"])
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
-        print(f"DEBUG device Accelerator = { Accelerator().process_index} | current_device = { torch.cuda.current_device()} | local_rank = {local_rank}")
+        print(f"current_device = { torch.cuda.current_device()} | local_rank = {local_rank}")
     else:
         local_rank = 0
 
