@@ -107,7 +107,7 @@ class Trainer:
     
     def _save_checkpoint(self, epoch):
         ckp = self.model.module.state_dict()
-        PATH = f"epoch_{epoch}_checkpoint.pt"
+        PATH = f"{CHECKPOINT_DIR}/epoch_{epoch}/checkpoint.pt"
         torch.save(ckp, PATH)
         print(f"Epoch {epoch} | Training checkpoint saved at {PATH}")
 
@@ -249,6 +249,7 @@ def load_pretrained_model():
 if __name__ == "__main__":
     DEBUG = True
     USE_DDP_TRAINING = True
+    CHECKPOINT_DIR = "/checkpoints"
     data_driver_path = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
 
     backend = "nccl"
