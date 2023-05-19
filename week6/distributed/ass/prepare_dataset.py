@@ -1,8 +1,6 @@
 from prompt import Prompter
 from datasets import load_dataset
-from utils.logger_utils import get_logger
 
-logger = get_logger()
 
 def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
     def tokenize(prompt, add_eos_token=True):
@@ -44,8 +42,10 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
     train_data.set_format("torch")
     valid_data.set_format("torch")
     
-    
     dataset["test"].to_json('dataset/val_data.json')
-    logger.info(f"Size of the train set: {len(train_data)}. Size of the validation set: {len(valid_data)}")
+    print(f"Train dataset shape: {train_data.shape}")
+    print(f"Valid dataset shape: {valid_data.shape}")
+    print(f"Size of the train set: {len(train_data)}. Size of the validation set: {len(valid_data)}")
+    
     
     return train_data, valid_data

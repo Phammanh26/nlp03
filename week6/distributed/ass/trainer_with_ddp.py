@@ -144,6 +144,10 @@ class Trainer:
                 "labels": torch.stack([sample["labels"].to(local_rank) for sample in x]),
             })
         
+
+        print(f"Train dataloader shape: {data_trainloader.shape}")
+        print(f"Valid dataset shape: {data_testloader.shape}")
+        
         return data_trainloader, data_testloader
     
     def _eval(self, eval_dataloader, epoch: int):
