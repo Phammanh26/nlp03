@@ -66,7 +66,7 @@ class Trainer:
             Loss value for the batch.
         """
         
-        
+        print(f"batch: {batch}")
         self.optimizer.zero_grad()
         outputs = self.model(**batch) 
         loss = outputs.loss
