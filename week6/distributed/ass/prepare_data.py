@@ -11,7 +11,8 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
             prompt,
             truncation=True,
             max_length=max_length,
-            padding="max_length"
+            padding="max_length",
+            padding_side='right'
             )
 
         if (
