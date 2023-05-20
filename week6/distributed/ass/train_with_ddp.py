@@ -66,13 +66,17 @@ class Trainer:
             Loss value for the batch.
         """
         
-        print(f"batch: {batch}")
-        self.optimizer.zero_grad()
-        outputs = self.model(**batch) 
-        loss = outputs.loss
-        loss.backward()
-        self.optimizer.step()
-
+        try:
+            self.optimizer.zero_grad()
+            outputs = self.model(**batch) 
+            loss = outputs.loss
+            loss.backward()
+            self.optimizer.step()
+        except:
+            print(f"batch: {batch}")
+            print(f"batch: {batch['input_ids'].shape}")
+            print(f"batch: {batch['labels'].shape}")
+            print(f"batch: {batch['attention_mask'].shape}")
         return loss.item()
 
     def _run_epoch(self, train_dataloader, epoch):
