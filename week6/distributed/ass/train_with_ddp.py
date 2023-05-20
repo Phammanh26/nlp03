@@ -18,8 +18,9 @@ from torch.utils.data import DataLoader, SequentialSampler
 
 
 from utils.common import download_from_driver
-from utils.logger_utils import get_logger
-from prepare_dataset import create_datasets
+from prepare_data import create_datasets
+from inference import generate_inference
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -113,12 +114,14 @@ class Trainer:
         # ckp = self.model.module.state_dict()
 
         path_dir = f"{self.output_dir}/epoch_{epoch}"
-        # path = f"{path_dir}/checkpoint.pt"
         
         # check path_dir exited
         if not os.path.exists(path_dir):
             os.makedirs(path_dir)
 
+        # Test inference
+        generate_inference(model = self.model, tokenizer= self.tokenizer, device=self.gpu_id)
+        
         # save checkpoints
         torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
 
