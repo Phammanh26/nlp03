@@ -138,7 +138,7 @@ class Trainer:
             eval_dataset,
             batch_size=self.batch_size,
             sampler=SequentialSampler(eval_dataset),
-            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True, padding='max_length', max_length = self.max_length))
+            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding='max_length', max_length = self.max_length))
         
 
        
