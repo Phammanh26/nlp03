@@ -34,11 +34,14 @@ def prepare_model_inputs(tokenizer, instruction, context, max_length):
 
 
 def generate_inference(model, tokenizer, device, max_length):
+    
     sample = {
         "instruction": "Describe what would happen if a person jumps off a cliff",
         "input": "No input",
         "output": "If a person jumps off a cliff, they could suffer severe injuries or even death due to the fall. Depending on the height of the cliff, they could experience a free fall of several seconds before hitting the ground. If they do not jump far enough away from the cliff, they could also hit the rocks and cause serious injuries."
     }
+
+    print(f"\Begin generate inference: {sample}")
 
     token_encoded = prepare_model_inputs(tokenizer, sample["instruction"], sample["input"], max_length)
 
@@ -49,5 +52,4 @@ def generate_inference(model, tokenizer, device, max_length):
             max_new_tokens =  max_length
         )
     response = tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
-    print(f"\nsample: {sample}")
     print(f"\nresponse: {response}")
