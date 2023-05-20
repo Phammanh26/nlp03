@@ -135,8 +135,9 @@ class Trainer:
             batch_size=self.batch_size,
             shuffle=False,
             sampler=DistributedSampler(train_dataset, rank=self.gpu_id) if self.is_ddp_training else None,
-            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True))
+            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True, padding = 'max_length', max_length = self.max_length))
 
+        print(f"data_trainloader: {data_trainloader}")
         # Create the DataLoaders
         data_testloader = DataLoader(
             eval_dataset,
