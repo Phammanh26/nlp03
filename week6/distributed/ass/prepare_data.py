@@ -41,10 +41,12 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
     
     prompter = Prompter()
     dataset = load_dataset('json', split='train', data_files=data_path)
+    print(f"Size data | {len(dataset)}")
     dataset = dataset.train_test_split(test_size=size_valid_set, seed=seed)
 
     train_data = dataset["train"].shuffle().map(generate_and_tokenize_prompt)
     valid_data = dataset["test"].map(generate_and_tokenize_prompt)
+    
     train_data.set_format("torch")
     valid_data.set_format("torch")
     
@@ -52,8 +54,8 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
     valid_data = valid_data.remove_columns(['instruction', 'input', 'output'])
 
     dataset["test"].to_json('dataset/val_data.json')
-   # Set the number of random samples to print
-    print(f"Size of the train set: {len(train_data)}. Size of the validation set: {len(valid_data)}")
     
+    # Set the number of random samples to print
+    print(f"Size data | train set = {len(train_data)} | test set = {len(valid_data)}")
     
     return train_data, valid_data
