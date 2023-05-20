@@ -72,7 +72,8 @@ class Trainer:
             loss = outputs.loss
             loss.backward()
             self.optimizer.step()
-        except:
+        except Exception as e:
+            print(f"ERROR: {e}")
             print(f"batch: {batch}")
             print(f"batch: {batch['input_ids'].shape}")
             print(f"batch: {batch['labels'].shape}")
