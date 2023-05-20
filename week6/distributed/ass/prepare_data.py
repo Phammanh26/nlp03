@@ -51,18 +51,7 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
     valid_data = valid_data.remove_columns(['instruction', 'input', 'output'])
 
     dataset["test"].to_json('dataset/val_data.json')
-    print(f"Train dataset shape: {train_data.shape}")
-    print(f"Valid dataset shape: {valid_data.shape}")
    # Set the number of random samples to print
-    num_samples = 5
-    # Generate random indices
-    random_indices = random.sample(range(len(train_data)), num_samples)
-
-    # Print the random samples
-    for index in random_indices:
-        sample = train_data[index]
-        print(f"index: {index} | attention_mask: {sample['attention_mask'].shape} | input_ids: {sample['input_ids'].shape}|labels: {sample['labels'].shape}")
-
     print(f"Size of the train set: {len(train_data)}. Size of the validation set: {len(valid_data)}")
     
     

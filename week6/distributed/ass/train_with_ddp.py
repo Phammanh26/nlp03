@@ -124,11 +124,6 @@ class Trainer:
         print(f"\nEpoch {epoch} | Training checkpoint saved at {path_dir}")
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
-
-        # Debug
-        sample = train_dataset[0]
-        print(f"DEBUG: {sample}")
-
         # Create the DataLoaders
         data_trainloader = DataLoader(
             train_dataset,
@@ -143,7 +138,7 @@ class Trainer:
             eval_dataset,
             batch_size=self.batch_size,
             sampler=SequentialSampler(eval_dataset),
-            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True))
+            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True, padding='max_length', max_length = self.max_length))
         
 
        
