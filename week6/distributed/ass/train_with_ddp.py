@@ -4,12 +4,8 @@ from tqdm import tqdm
 
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
-from transformers import (
-    AutoConfig, 
-    AutoModelForCausalLM, 
-    AutoTokenizer, 
-  )
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, Trainer
+
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 from accelerate import Accelerator
@@ -140,22 +136,14 @@ class Trainer:
             batch_size=self.batch_size,
             shuffle=False,
             sampler=DistributedSampler(train_dataset, rank=self.gpu_id) if self.is_ddp_training else None,
-            collate_fn=lambda x: {
-                "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
-                "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
-                "labels": torch.stack([sample["labels"].to(local_rank) for sample in x]),
-            })
+            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True))
 
         # Create the DataLoaders
         data_testloader = DataLoader(
             eval_dataset,
             batch_size=self.batch_size,
             sampler=SequentialSampler(eval_dataset),
-            collate_fn=lambda x: {
-                "input_ids": torch.stack([sample["input_ids"].to(local_rank) for sample in x]),
-                "attention_mask": torch.stack([sample["attention_mask"].to(local_rank) for sample in x]),
-                "labels": torch.stack([sample["labels"].to(local_rank) for sample in x]),
-            })
+            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True))
         
 
        
