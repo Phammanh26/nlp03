@@ -267,7 +267,7 @@ if __name__ == "__main__":
     model_path = 'bigscience/bloom-560m'
     data_path = 'alpaca_data.json'
     size_valid_set = 0.1
-    max_length = 128
+    max_length = 512
     num_epochs = 3
     batch_size = 4
     gradient_accumulation_steps = 8

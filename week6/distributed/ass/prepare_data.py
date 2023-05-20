@@ -27,6 +27,7 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
 
         result["labels"] = result["input_ids"].copy()
         return result
+
     
     def generate_and_tokenize_prompt(data_point):
         full_prompt = prompter.generate_prompt(
