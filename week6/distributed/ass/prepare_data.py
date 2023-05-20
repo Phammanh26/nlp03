@@ -58,7 +58,7 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
     # Print the random samples
     for index in random_indices:
         sample = train_data[index]
-        print(sample)
+        print(f"index: {index} | attention_mask: {sample['attention_mask'].shape} | input_ids: {sample['input_ids'].shape}|labels: {sample['labels'].shape}")
 
     print(f"Size of the train set: {len(train_data)}. Size of the validation set: {len(valid_data)}")
     
