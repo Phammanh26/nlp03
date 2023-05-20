@@ -136,7 +136,6 @@ class Trainer:
             sampler=DistributedSampler(train_dataset, rank=self.gpu_id) if self.is_ddp_training else None,
             collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding='max_length', max_length = self.max_length))
 
-        print(f"data_trainloader: {data_trainloader}")
         # Create the DataLoaders
         data_testloader = DataLoader(
             eval_dataset,
@@ -267,7 +266,7 @@ if __name__ == "__main__":
     model_path = 'bigscience/bloom-560m'
     data_path = 'alpaca_data.json'
     size_valid_set = 0.1
-    max_length = 512
+    max_length = 64
     num_epochs = 3
     batch_size = 4
     gradient_accumulation_steps = 8
