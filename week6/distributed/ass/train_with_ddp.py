@@ -128,6 +128,12 @@ class Trainer:
         print(f"\nEpoch {epoch} | Training checkpoint saved at {path_dir}")
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
+
+        # Debug
+        sample = train_dataset[0]
+        print(f"DEBUG: {sample}")
+        print(f"sample: {sample['input_ids']}")
+
         # Create the DataLoaders
         data_trainloader = DataLoader(
             train_dataset,
