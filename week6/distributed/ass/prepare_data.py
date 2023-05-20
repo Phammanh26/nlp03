@@ -53,11 +53,11 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
    # Set the number of random samples to print
     num_samples = 5
     # Generate random indices
-    random_indices = random.sample(range(len(dataset)), num_samples)
+    random_indices = random.sample(range(len(train_data)), num_samples)
 
     # Print the random samples
     for index in random_indices:
-        sample = dataset[index]
+        sample = train_data[index]
         print(sample)
 
     print(f"Size of the train set: {len(train_data)}. Size of the validation set: {len(valid_data)}")
