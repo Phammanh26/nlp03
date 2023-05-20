@@ -43,8 +43,8 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
 
     train_data = dataset["train"].shuffle().map(generate_and_tokenize_prompt)
     valid_data = dataset["test"].map(generate_and_tokenize_prompt)
-    # train_data.set_format("torch")
-    # valid_data.set_format("torch")
+    train_data.set_format("torch")
+    valid_data.set_format("torch")
     
     dataset["test"].to_json('dataset/val_data.json')
     print(f"Train dataset shape: {train_data.shape}")
