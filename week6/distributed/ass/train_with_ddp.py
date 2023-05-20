@@ -128,7 +128,6 @@ class Trainer:
         # Debug
         sample = train_dataset[0]
         print(f"DEBUG: {sample}")
-        print(f"sample: {sample['input_ids']}")
 
         # Create the DataLoaders
         data_trainloader = DataLoader(
