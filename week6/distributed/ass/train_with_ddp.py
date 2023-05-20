@@ -120,7 +120,7 @@ class Trainer:
             os.makedirs(path_dir)
 
         # Test inference
-        generate_inference(model = self.model, tokenizer= self.tokenizer, device=self.gpu_id)
+        generate_inference(model = self.model, tokenizer= self.tokenizer, device=self.gpu_id, max_length = self.max_length)
         
         # save checkpoints
         torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
