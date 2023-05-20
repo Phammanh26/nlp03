@@ -26,8 +26,8 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
             result["attention_mask"].append(1)
 
         result["labels"] = result["input_ids"].copy()
-        print(f'labels: {result["labels"].shape}')
-        print(f'input_ids: {result["input_ids"].shape}')
+        print(f'labels: {len(result["labels"])}')
+        print(f'input_ids: {len(result["input_ids"])}')
         return result
 
     
