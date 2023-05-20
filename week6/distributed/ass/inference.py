@@ -46,7 +46,7 @@ def generate_inference(model, tokenizer, device, max_length):
     token_encoded = prepare_model_inputs(tokenizer, sample["instruction"], sample["input"], max_length)
 
     outputs = model.generate(
-            input_ids=token_encoded['input_ids'].reshape(1, max_length).to(device),
+            input_ids=token_encoded['input_ids'].to(device),
             return_dict_in_generate=True,
             output_scores=True,
             max_new_tokens =  max_length
