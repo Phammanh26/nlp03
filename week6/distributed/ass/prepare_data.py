@@ -1,5 +1,6 @@
 from prompt import Prompter
 from datasets import load_dataset
+import random
 
 from typing import Union
 
@@ -49,8 +50,15 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
     dataset["test"].to_json('dataset/val_data.json')
     print(f"Train dataset shape: {train_data.shape}")
     print(f"Valid dataset shape: {valid_data.shape}")
-    for t_data in train_data[0:10]:
-        print(t_data.shape)
+   # Set the number of random samples to print
+    num_samples = 5
+    # Generate random indices
+    random_indices = random.sample(range(len(dataset)), num_samples)
+
+    # Print the random samples
+    for index in random_indices:
+        sample = dataset[index]
+        print(sample)
 
     print(f"Size of the train set: {len(train_data)}. Size of the validation set: {len(valid_data)}")
     
