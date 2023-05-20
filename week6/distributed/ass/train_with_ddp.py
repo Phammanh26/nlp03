@@ -96,12 +96,9 @@ class Trainer:
             train_progress_bar = train_dataloader
         
         for step, batch in enumerate(tqdm(train_progress_bar)):
-            print(f"\nEpoch [{epoch}] | Batch step [{step}] | at GPU [{self.gpu_id}]")
             batch = {key: value.to(self.gpu_id) for key, value in batch.items()}
             loss = self._run_batch(batch)
-            epoch_loss += loss
-
-            
+            epoch_loss += loss 
         
         return epoch_loss
     
@@ -119,8 +116,6 @@ class Trainer:
         
         # save checkpoints
         torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
-
-        print(f"\nEpoch {epoch} | Training checkpoint saved at {path_dir}")
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
         # Create the DataLoaders
@@ -174,7 +169,6 @@ class Trainer:
             seed = seed
            )
         
-        
         train_dataloader, eval_dataloader = self.prepare_dataloader(train_dataset, eval_dataset)
         
         if self.is_ddp_training:
@@ -184,8 +178,6 @@ class Trainer:
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
 
         avg_train_loss = 0
-        if self._is_master_process():
-            print(f"\nStart training | total epochs: {self.num_epochs}")
         
         for epoch in range(self.num_epochs):
             if self.is_ddp_training:
@@ -199,11 +191,6 @@ class Trainer:
             # Save checkpoint
             if self._is_master_process():
                 self._save_checkpoint(epoch = epoch)
-            
-            print(f"\nCompleted training epoch: {epoch} | train loss = {train_loss} | eval loss = {eval_loss}")
-
-
-       
 
 
 def load_tokenizer_from_pretrained_model(model_path):
