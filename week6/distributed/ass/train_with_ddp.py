@@ -72,13 +72,11 @@ class Trainer:
             loss = outputs.loss
             loss.backward()
             self.optimizer.step()
-        
+            print(f"input_ids shape: {batch['input_ids'].shape}|labels shape: {batch['labels'].shape}| attention_mask shape: {batch['attention_mask'].shape}")
         except Exception as e:
             print(f"ERROR: {e}")
             # print(f"batch: {batch}")
-            print(f"input_ids shape: {batch['input_ids'].shape}")
-            print(f"labels shape: {batch['labels'].shape}")
-            print(f"attention_mask shape: {batch['attention_mask'].shape}")
+            print(f"input_ids shape: {batch['input_ids'].shape}| labels shape: {batch['labels'].shape}|attention_mask shape: {batch['attention_mask'].shape}")
         return loss.item()
 
     def _run_epoch(self, train_dataloader, epoch):
