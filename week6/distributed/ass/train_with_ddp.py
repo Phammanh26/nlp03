@@ -21,7 +21,16 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class Trainer:
-    def __init__( self, model, tokenizer, gpu_id: int, is_ddp_training: bool = True, output_dir: str = 'checkpoints/',  num_epochs: int = 10,max_length: int = 128, batch_size: int = 8 ):
+    def __init__( self,
+                model, 
+                tokenizer, 
+                gpu_id: int, 
+                is_ddp_training: bool = True, 
+                is_accelerate_training: bool = False, 
+                output_dir: str = 'checkpoints/',  
+                num_epochs: int = 10, 
+                max_length: int = 128, 
+                batch_size: int = 8 ):
         """
         Initialize the Trainer class.
 
@@ -41,6 +50,15 @@ class Trainer:
         self.output_dir = output_dir
         self.tokenizer = tokenizer
         self.is_ddp_training = is_ddp_training
+        self.is_accelerate_training = is_accelerate_training
+
+        # Validate arguments:
+        if is_ddp_training == is_accelerate_training:
+            raise ValueError("Please choose only one of the two arguments:\
+                            is_ddp_training or is_accelerate_training to be True. \
+                            Both arguments cannot be True or False simultaneously.")
+
+        
         self.model = model  
         self.gpu_id = gpu_id
 
@@ -57,6 +75,11 @@ class Trainer:
             output_device=self.gpu_id
             )
     
+    def _set_accelerator_training(self):
+        # TODO
+        # SET accelerator training
+        pass
+
     def _is_master_process(self):
         if self.is_ddp_training:
             ddp_rank = int(os.environ['RANK'])
@@ -121,7 +144,14 @@ class Trainer:
             os.makedirs(path_dir)
 
         # save checkpoints
-        torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
+        if self.is_ddp_training:
+            torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
+        elif self.is_accelerate_training:
+            # TODO
+            # Manh Pham: dev them
+            pass
+        else:
+            pass
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
         
@@ -256,7 +286,7 @@ def load_pretrained_model():
 
 if __name__ == "__main__":
     DEBUG = True
-    USE_DDP_TRAINING = True
+    TRAINING_STRATEGIES =  ["ddp", "accelerate"]
     OUTPUT_DIR = "checkpoints/"
     DRIVER_DATA_PATH = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
 
@@ -279,15 +309,21 @@ if __name__ == "__main__":
     log_freq = 1
     eval_freq = 150
     
+
     if DEBUG == False:
         # Download data
         download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
     
-    if USE_DDP_TRAINING:
+
+    # TODO
+    # Choose strategy
+    strategy = TRAINING_STRATEGIES[0]
+    
+    if strategy  == "ddp":
+        # TODO setup 
         init_process_group(backend=backend)
         local_rank =  int(os.environ["LOCAL_RANK"])
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
-        print(f"\ncurrent_device = { torch.cuda.current_device()} | local_rank = {local_rank}")
     else:
         local_rank = 0
 
@@ -305,7 +341,8 @@ if __name__ == "__main__":
         gpu_id=local_rank,
         tokenizer=tokenizer,
         output_dir= OUTPUT_DIR,
-        is_ddp_training = USE_DDP_TRAINING)
+        is_ddp_training = True if strategy == "ddp" else False,
+        is_accelerate_training = True if strategy == "ddp" else False)
     
     # set ddp for wraping model
     # execute trainer 
@@ -314,8 +351,8 @@ if __name__ == "__main__":
         size_valid_set = size_valid_set,
         seed =seed
     )
-    
-    if USE_DDP_TRAINING:
+
+    if strategy  == "ddp":
         destroy_process_group()
 
 
