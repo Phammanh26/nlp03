@@ -21,7 +21,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class Trainer:
-    def __init__( self, model, tokenizer, gpu_id: int, is_ddp_training: bool, output_dir: str = 'checkpoints/',  num_epochs: int = 10,max_length: int = 128, batch_size: int = 8 ):
+    def __init__( self, model, tokenizer, gpu_id: int, is_ddp_training: bool = True, output_dir: str = 'checkpoints/',  num_epochs: int = 10,max_length: int = 128, batch_size: int = 8 ):
         """
         Initialize the Trainer class.
 
@@ -38,15 +38,24 @@ class Trainer:
         self.num_epochs = num_epochs
         self.max_length = max_length
         self.batch_size = batch_size
-        self.gpu_id = gpu_id
-        self.is_ddp_training = is_ddp_training
         self.output_dir = output_dir
         self.tokenizer = tokenizer
-        self.model = model.to(f"cuda:{self.gpu_id}")
+        self.is_ddp_training = is_ddp_training
+        self.model = model  
+        self.gpu_id = gpu_id
+
+        # move model to device
+        model.to(f"cuda:{self.gpu_id}")
         
 
-    def set_ddp_training(self):
-        self.model = DDP(self.model, device_ids=[self.gpu_id], output_device=self.gpu_id)
+    def _set_ddp_training(self):
+        # TODO
+        # SET DISTRIBUTED DATA PARALLEL
+        self.model = DDP(
+            self.model,
+            device_ids=[self.gpu_id], 
+            output_device=self.gpu_id
+            )
     
     def _is_master_process(self):
         if self.is_ddp_training:
@@ -111,13 +120,12 @@ class Trainer:
         if not os.path.exists(path_dir):
             os.makedirs(path_dir)
 
-        # Test inference
-        generate_inference(model = self.model.module, tokenizer= self.tokenizer, device=self.gpu_id, max_length = self.max_length)
-        
         # save checkpoints
         torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
+        
+        # TODO
         # Create the DataLoaders
         data_trainloader = DataLoader(
             train_dataset,
@@ -126,6 +134,7 @@ class Trainer:
             sampler=DistributedSampler(train_dataset, rank=self.gpu_id) if self.is_ddp_training else None,
             collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True))
 
+        # TODO
         # Create the DataLoaders
         data_testloader = DataLoader(
             eval_dataset,
@@ -138,7 +147,6 @@ class Trainer:
         return data_trainloader, data_testloader
     
     def _eval(self, eval_dataloader, epoch: int):
-        # TODO: Evaluation
         avg_loss = 0
         model.eval()
         if self._is_master_process():
@@ -172,7 +180,7 @@ class Trainer:
         train_dataloader, eval_dataloader = self.prepare_dataloader(train_dataset, eval_dataset)
         
         if self.is_ddp_training:
-            self.set_ddp_training()
+            self._set_ddp_training()
 
         # Setup the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
@@ -180,16 +188,22 @@ class Trainer:
         avg_train_loss = 0
         
         for epoch in range(self.num_epochs):
+            
             if self.is_ddp_training:
                 train_dataloader.sampler.set_epoch(epoch)
+            
             train_loss = self._run_epoch(train_dataloader, epoch)
             avg_train_loss += train_loss
             
-            # Evaluate after each epoch
-            eval_loss = self._eval(eval_dataloader = eval_dataloader, epoch = epoch)
-            
-            # Save checkpoint
+            # TODO
+            # Evalaute model & Save checkpoint after epoch
             if self._is_master_process():
+                # TODO
+                # Evaluate after each epoch
+                eval_loss = self._eval(eval_dataloader = eval_dataloader, epoch = epoch)
+                
+                # Show
+                print(f"epoch = {epoch} | avg_train_loss = {avg_train_loss} | eval_loss = {eval_loss}")
                 self._save_checkpoint(epoch = epoch)
 
 
@@ -217,6 +231,8 @@ def load_tokenizer_from_pretrained_model(model_path):
     return tokenizer
 
 def load_pretrained_model():
+    # TODO
+    # Load  pretrained model
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         trust_remote_code=True,
@@ -298,6 +314,7 @@ if __name__ == "__main__":
         size_valid_set = size_valid_set,
         seed =seed
     )
+    
     if USE_DDP_TRAINING:
         destroy_process_group()
 
