@@ -323,10 +323,8 @@ if __name__ == "__main__":
         # TODO setup 
         init_process_group(backend=backend)
         local_rank =  int(os.environ["LOCAL_RANK"])
-        torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
-    else:
-        local_rank = 0
-
+        torch.cuda.set_device(local_rank)
+   
     # Prepare model
     model = load_pretrained_model()
     # Get tokenizer
