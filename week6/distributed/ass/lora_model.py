@@ -1,0 +1,758 @@
+import importlib
+import sys, os
+
+from contextlib import contextmanager
+
+import math
+import re
+import copy
+import warnings
+from dataclasses import asdict, dataclass, field
+from enum import Enum
+from typing import List, Optional, Union
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from peft import (
+    PeftConfig,
+    LoraConfig,
+    get_peft_model_state_dict,
+) 
+
+from transformers.pytorch_utils import Conv1D
+from transformers.utils import PushToHubMixin
+from accelerate.hooks import AlignDevicesHook, add_hook_to_module, remove_hook_from_submodules
+import bitsandbytes as bnb
+
+from lora_layer import LoraLayer
+
+class Embedding(nn.Embedding, LoraLayer):
+    # LoRA implemented in a Embedding layer
+    def __init__(
+        self,
+        adapter_name: str,
+        num_embeddings: int,
+        embedding_dim: int,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0.0,
+        **kwargs,
+    ):
+        init_lora_weights = kwargs.pop("init_lora_weights", True)
+
+        nn.Embedding.__init__(self, num_embeddings, embedding_dim, **kwargs)
+        LoraLayer.__init__(self, in_features=num_embeddings, out_features=embedding_dim)
+
+        self.weight.requires_grad = False
+
+        nn.Embedding.reset_parameters(self)
+        self.update_layer_embedding(adapter_name, r, lora_alpha, lora_dropout, init_lora_weights)
+        self.active_adapter = adapter_name
+
+    def unmerge(self, mode: bool = True):
+        if not self.merged:
+            warnings.warn("Already unmerged. Nothing to do.")
+            return
+        if self.r[self.active_adapter] > 0:
+            self.weight.data -= (
+                transpose(
+                    self.lora_embedding_B[self.active_adapter] @ self.lora_embedding_A[self.active_adapter], True
+                )
+                * self.scaling[self.active_adapter]
+            )
+            self.merged = False
+
+    def merge(self):
+        if self.merged:
+            warnings.warn("Already merged. Nothing to do.")
+            return
+        if self.r[self.active_adapter] > 0:
+            self.weight.data += (
+                transpose(
+                    self.lora_embedding_B[self.active_adapter] @ self.lora_embedding_A[self.active_adapter], True
+                )
+                * self.scaling[self.active_adapter]
+            )
+            self.merged = True
+
+    def forward(self, x: torch.Tensor):
+        if self.disable_adapters:
+            if self.r[self.active.adapter] > 0 and self.merged:
+                self.weight.data -= (
+                    transpose(
+                        self.lora_embedding_B[self.active_adapter].weight
+                        @ self.lora_embedding_A[self.active_adapter].weight,
+                        True,
+                    )
+                    * self.scaling[self.active_adapter]
+                )
+                self.merged = False
+            return nn.Embedding.forward(self, x)
+
+        elif self.r[self.active_adapter] > 0 and not self.merged:
+            result = nn.Embedding.forward(self, x)
+            if self.r[self.active_adapter] > 0:
+                after_A = F.embedding(
+                    x,
+                    self.lora_embedding_A[self.active_adapter].T,
+                    self.padding_idx,
+                    self.max_norm,
+                    self.norm_type,
+                    self.scale_grad_by_freq,
+                    self.sparse,
+                )
+                result += (after_A @ self.lora_embedding_B[self.active_adapter].T) * self.scaling[self.active_adapter]
+            return result
+        else:
+            return nn.Embedding.forward(self, x)
+        
+
+class Linear(nn.Linear, LoraLayer):
+    # Lora implemented in a dense layer
+    def __init__(
+        self,
+        adapter_name: str,
+        in_features: int,
+        out_features: int,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0.0,
+        fan_in_fan_out: bool = False,  # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
+        **kwargs,
+    ):
+        init_lora_weights = kwargs.pop("init_lora_weights", True)
+
+        nn.Linear.__init__(self, in_features, out_features, **kwargs)
+        LoraLayer.__init__(self, in_features=in_features, out_features=out_features)
+        # Freezing the pre-trained weight matrix
+        self.weight.requires_grad = False
+
+        self.fan_in_fan_out = fan_in_fan_out
+        if fan_in_fan_out:
+            self.weight.data = self.weight.data.T
+
+        nn.Linear.reset_parameters(self)
+        self.update_layer(adapter_name, r, lora_alpha, lora_dropout, init_lora_weights)
+        self.active_adapter = adapter_name
+
+    def merge(self):
+        if self.active_adapter not in self.lora_A.keys():
+            return
+        if self.merged:
+            warnings.warn("Already merged. Nothing to do.")
+            return
+        if self.r[self.active_adapter] > 0:
+            self.weight.data += (
+                transpose(
+                    self.lora_B[self.active_adapter].weight @ self.lora_A[self.active_adapter].weight,
+                    self.fan_in_fan_out,
+                )
+                * self.scaling[self.active_adapter]
+            )
+            self.merged = True
+
+    def unmerge(self):
+        if self.active_adapter not in self.lora_A.keys():
+            return
+        if not self.merged:
+            warnings.warn("Already unmerged. Nothing to do.")
+            return
+        if self.r[self.active_adapter] > 0:
+            self.weight.data -= (
+                transpose(
+                    self.lora_B[self.active_adapter].weight @ self.lora_A[self.active_adapter].weight,
+                    self.fan_in_fan_out,
+                )
+                * self.scaling[self.active_adapter]
+            )
+            self.merged = False
+
+    def forward(self, x: torch.Tensor):
+        previous_dtype = x.dtype
+        if self.active_adapter not in self.lora_A.keys():
+            return F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+        if self.disable_adapters:
+            if self.r[self.active_adapter] > 0 and self.merged:
+                self.unmerge()
+            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+        elif self.r[self.active_adapter] > 0 and not self.merged:
+            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+
+            x = x.to(self.lora_A[self.active_adapter].weight.dtype)
+
+            result += (
+                self.lora_B[self.active_adapter](
+                    self.lora_A[self.active_adapter](self.lora_dropout[self.active_adapter](x))
+                )
+                * self.scaling[self.active_adapter]
+            )
+        else:
+            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+
+        result = result.to(previous_dtype)
+
+        return result
+
+
+class LoraModel(torch.nn.Module):
+
+    def __init__(self, model, config, adapter_name='default'):
+        super().__init__()
+        self.model = model
+        self.forward = self.model.forward
+        self.peft_config = config
+        self.add_adapter(adapter_name, self.peft_config[adapter_name])
+
+    def add_adapter(self, adapter_name, config=None):
+        if config is not None:
+            model_config = self.model.config.to_dict() if hasattr(self.model.config, "to_dict") else self.model.config
+            config = self._prepare_lora_config(config, model_config)
+            self.peft_config[adapter_name] = config
+        self._find_and_replace(adapter_name)
+        if len(self.peft_config) > 1 and self.peft_config[adapter_name].bias != "none":
+            raise ValueError(
+                "LoraModel supports only 1 adapter with bias. When using multiple adapters, set bias to 'none' for all adapters."
+            )
+        mark_only_lora_as_trainable(self.model, self.peft_config[adapter_name].bias)
+        if self.peft_config[adapter_name].inference_mode:
+            _freeze_adapter(self.model, adapter_name)
+
+    def _find_and_replace(self, adapter_name):
+        lora_config = self.peft_config[adapter_name]
+        loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
+        loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
+        if (loaded_in_4bit or loaded_in_8bit) and not is_bnb_available():
+            raise ImportError(
+                "To use Lora with 8-bit or 4-bit quantization, please install the `bitsandbytes` package. "
+                "You can install it with `pip install bitsandbytes`."
+            )
+        is_target_modules_in_base_model = False
+        kwargs = {
+            "r": lora_config.r,
+            "lora_alpha": lora_config.lora_alpha,
+            "lora_dropout": lora_config.lora_dropout,
+            "fan_in_fan_out": lora_config.fan_in_fan_out,
+            "init_lora_weights": lora_config.init_lora_weights,
+        }
+        key_list = [key for key, _ in self.model.named_modules()]
+        for key in key_list:
+            if isinstance(lora_config.target_modules, str):
+                target_module_found = re.fullmatch(lora_config.target_modules, key)
+            else:
+                target_module_found = any(key.endswith(target_key) for target_key in lora_config.target_modules)
+            if target_module_found:
+                if not is_target_modules_in_base_model:
+                    is_target_modules_in_base_model = True
+                parent, target, target_name = _get_submodules(self.model, key)
+                if hasattr(target, "bias"):
+                    bias = target.bias is not None
+
+                if isinstance(target, LoraLayer):
+                    target.update_layer(
+                        adapter_name,
+                        lora_config.r,
+                        lora_config.lora_alpha,
+                        lora_config.lora_dropout,
+                        lora_config.init_lora_weights,
+                    )
+                else:
+                    if loaded_in_8bit and isinstance(target, bnb.nn.Linear8bitLt):
+                        eightbit_kwargs = kwargs.copy()
+                        eightbit_kwargs.update(
+                            {
+                                "has_fp16_weights": target.state.has_fp16_weights,
+                                "memory_efficient_backward": target.state.memory_efficient_backward,
+                                "threshold": target.state.threshold,
+                                "index": target.index,
+                            }
+                        )
+                        new_module = Linear8bitLt(
+                            adapter_name, target.in_features, target.out_features, bias=bias, **eightbit_kwargs
+                        )
+                        
+                    elif isinstance(target, torch.nn.Embedding):
+                        embedding_kwargs = kwargs.copy()
+                        embedding_kwargs.pop("fan_in_fan_out", None)
+                        in_features, out_features = target.num_embeddings, target.embedding_dim
+                        new_module = Embedding(adapter_name, in_features, out_features, **embedding_kwargs)
+                    else:
+                        if isinstance(target, torch.nn.Linear):
+                            in_features, out_features = target.in_features, target.out_features
+                            if kwargs["fan_in_fan_out"]:
+                                warnings.warn(
+                                    "fan_in_fan_out is set to True but the target module is `torch.nn.Linear`. "
+                                    "Setting fan_in_fan_out to False."
+                                )
+                                kwargs["fan_in_fan_out"] = lora_config.fan_in_fan_out = False
+                        elif isinstance(target, Conv1D):
+                            in_features, out_features = (
+                                target.weight.ds_shape if hasattr(target.weight, "ds_shape") else target.weight.shape
+                            )
+                            if not kwargs["fan_in_fan_out"]:
+                                warnings.warn(
+                                    "fan_in_fan_out is set to False but the target module is `Conv1D`. "
+                                    "Setting fan_in_fan_out to True."
+                                )
+                                kwargs["fan_in_fan_out"] = lora_config.fan_in_fan_out = True
+                        else:
+                            raise ValueError(
+                                f"Target module {target} is not supported. "
+                                f"Currently, only `torch.nn.Linear` and `Conv1D` are supported."
+                            )
+                        new_module = Linear(adapter_name, in_features, out_features, bias=bias, **kwargs)
+
+                    self._replace_module(parent, target_name, new_module, target)
+        if not is_target_modules_in_base_model:
+            raise ValueError(
+                f"Target modules {lora_config.target_modules} not found in the base model. "
+                f"Please check the target modules and try again."
+            )
+
+    def _replace_module(self, parent_module, child_name, new_module, old_module):
+        setattr(parent_module, child_name, new_module)
+        new_module.weight = old_module.weight
+        if hasattr(old_module, "bias"):
+            if old_module.bias is not None:
+                new_module.bias = old_module.bias
+
+        if getattr(old_module, "state", None) is not None:
+            new_module.state = old_module.state
+            new_module.to(old_module.weight.device)
+
+        # dispatch to correct device
+        for name, module in new_module.named_modules():
+            if "lora_" in name:
+                module.to(old_module.weight.device)
+
+    def __getattr__(self, name: str):
+        """Forward missing attributes to the wrapped module."""
+        try:
+            return super().__getattr__(name)  # defer to nn.Module's logic
+        except AttributeError:
+            return getattr(self.model, name)
+
+    def get_peft_config_as_dict(self, inference: bool = False):
+        config_dict = {}
+        for key, value in self.peft_config.items():
+            config = {k: v.value if isinstance(v, Enum) else v for k, v in asdict(value).items()}
+            if inference:
+                config["inference_mode"] = True
+        config_dict[key] = config
+        return config
+
+    def _set_adapter_layers(self, enabled=True):
+        for module in self.model.modules():
+            if isinstance(module, LoraLayer):
+                module.disable_adapters = False if enabled else True
+
+    def enable_adapter_layers(self):
+        self._set_adapter_layers(enabled=True)
+
+    def disable_adapter_layers(self):
+        self._set_adapter_layers(enabled=False)
+
+    def set_adapter(self, adapter_name):
+        for module in self.model.modules():
+            if isinstance(module, LoraLayer):
+                if module.merged:
+                    warnings.warn("Adapter cannot be set when the model is merged. Unmerging the model first.")
+                    module.unmerge()
+                module.active_adapter = adapter_name
+
+    def merge_adapter(self):
+        for module in self.model.modules():
+            if isinstance(module, LoraLayer):
+                module.merge()
+
+    def unmerge_adapter(self):
+        for module in self.model.modules():
+            if isinstance(module, LoraLayer):
+                module.unmerge()
+
+    @staticmethod
+    def _prepare_lora_config(peft_config, model_config):
+        if peft_config.target_modules is None:
+            if model_config["model_type"] not in TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING:
+                raise ValueError("Please specify `target_modules` in `peft_config`")
+            peft_config.target_modules = TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING[model_config["model_type"]]
+        if peft_config.inference_mode:
+            peft_config.merge_weights = True
+        return peft_config
+
+    def merge_and_unload(self):
+        r"""
+        This method merges the LoRa layers into the base model. This is needed if someone wants to use the base model
+        as a standalone model.
+        """
+        if getattr(self.config, "model_type", None) == "gpt2":
+            raise ValueError("GPT2 models are not supported for merging LORA layers")
+
+        if getattr(self.model, "is_loaded_in_8bit", False) or getattr(self.model, "is_loaded_in_4bit", False):
+            raise ValueError("Cannot merge LORA layers when the model is loaded in 8-bit mode")
+
+        key_list = [key for key, _ in self.model.named_modules() if "lora" not in key]
+        for key in key_list:
+            try:
+                parent, target, target_name = _get_submodules(self.model, key)
+            except AttributeError:
+                continue
+            if isinstance(target, LoraLayer):
+                bias = target.bias is not None
+                new_module = torch.nn.Linear(target.in_features, target.out_features, bias=bias)
+                target.merge()
+                self._replace_module(parent, target_name, new_module, target)
+
+            # save any additional trainable modules part of `modules_to_save`
+            if isinstance(target, ModulesToSaveWrapper):
+                setattr(parent, target_name, target.modules_to_save[target.active_adapter])
+
+        return self.model
+
+    def add_weighted_adapter(self, adapters, weights, adapter_name):
+        if len({self.peft_config[adapter].r for adapter in adapters}) != 1:
+            raise ValueError("All adapters must have the same r value")
+        self.peft_config[adapter_name] = self.peft_config[adapters[0]]
+        self.peft_config[adapter_name].lora_alpha = self.peft_config[adapters[0]].r
+        self._find_and_replace(adapter_name)
+        mark_only_lora_as_trainable(self.model, self.peft_config[adapter_name].bias)
+        _freeze_adapter(self.model, adapter_name)
+        key_list = [key for key, _ in self.model.named_modules() if "lora" not in key]
+        for key in key_list:
+            _, target, _ = _get_submodules(self.model, key)
+            if isinstance(target, LoraLayer):
+                if adapter_name in target.lora_A:
+                    target.lora_A[adapter_name].weight.data = target.lora_A[adapter_name].weight.data * 0.0
+                    target.lora_B[adapter_name].weight.data = target.lora_B[adapter_name].weight.data * 0.0
+                    for adapter, weight in zip(adapters, weights):
+                        if adapter not in target.lora_A:
+                            continue
+                        target.lora_A[adapter_name].weight.data += (
+                            target.lora_A[adapter].weight.data * weight * target.scaling[adapter]
+                        )
+                        target.lora_B[adapter_name].weight.data += target.lora_B[adapter].weight.data * weight
+
+                elif adapter_name in target.lora_embedding_A:
+                    target.lora_embedding_A[adapter_name].data = target.lora_embedding_A[adapter_name].data * 0.0
+                    target.lora_embedding_B[adapter_name].data = target.lora_embedding_B[adapter_name].data * 0.0
+                    for adapter, weight in zip(adapters, weights):
+                        if adapter not in target.lora_embedding_A:
+                            continue
+                        target.lora_embedding_A[adapter_name].data += (
+                            target.lora_embedding_A[adapter].data * weight * target.scaling[adapter]
+                        )
+                        target.lora_embedding_B[adapter_name].data += target.lora_embedding_B[adapter].data * weight
+
+
+class LoraModelForCasualLM(PushToHubMixin, torch.nn.Module):
+
+    def __init__(self, model, peft_config: PeftConfig, adapter_name="default"):
+        super().__init__()
+        self.base_model = model
+        self.config = self.base_model.config
+        self.modules_to_save = None
+        self.peft_config = {}
+        self.active_adapter = adapter_name
+        self.peft_type = peft_config.peft_type
+        self.base_model_torch_dtype = getattr(model, "dtype", None)
+        self.peft_config[adapter_name] = peft_config
+        self.base_model = LoraModel(self.base_model, self.peft_config, adapter_name)
+        self.set_additional_trainable_modules(peft_config, adapter_name)
+        
+        self.base_model_prepare_inputs_for_generation = self.base_model.prepare_inputs_for_generation
+
+    def save_pretrained(self, save_directory, **kwargs):
+        if os.path.isfile(save_directory):
+            raise ValueError(f"Provided path ({save_directory}) should be a directory, not a file")
+        os.makedirs(save_directory, exist_ok=True)
+
+        for adapter_name, peft_config in self.peft_config.items():
+            # save only the trainable weights
+            output_state_dict = get_peft_model_state_dict(
+                self, state_dict=kwargs.get("state_dict", None), adapter_name=adapter_name
+            )
+            output_dir = os.path.join(save_directory, adapter_name) if adapter_name != "default" else save_directory
+            os.makedirs(output_dir, exist_ok=True)
+            torch.save(output_state_dict, os.path.join(output_dir, "adapter_model.bin"))
+
+            # save the config and change the inference mode to `True`
+            if peft_config.base_model_name_or_path is None:
+                peft_config.base_model_name_or_path = self.base_model.model.__dict__.get("name_or_path", None)
+            inference_mode = peft_config.inference_mode
+            peft_config.inference_mode = True
+            peft_config.save_pretrained(output_dir)
+            peft_config.inference_mode = inference_mode
+
+    @classmethod
+    def from_pretrained(cls, model, model_id, adapter_name="default", is_trainable=False, **kwargs):
+        # load the config
+        config = LoraConfig.from_pretrained(model_id, subfolder=kwargs.get("subfolder", None))
+
+        if (getattr(model, "hf_device_map", None) is not None) and len(
+            set(model.hf_device_map.values()).intersection({"cpu", "disk"})
+        ) > 0:
+            remove_hook_from_submodules(model)
+
+
+        config.inference_mode = not is_trainable
+
+        model = LoraModel[config.task_type](model, config, adapter_name)
+        model.load_adapter(model_id, adapter_name, **kwargs)
+        return model
+
+    def print_trainable_parameters(self):
+        """
+        Prints the number of trainable parameters in the model.
+        """
+        trainable_params = 0
+        all_param = 0
+        for _, param in self.named_parameters():
+            num_params = param.numel()
+            # if using DS Zero 3 and the weights are initialized empty
+            if num_params == 0 and hasattr(param, "ds_numel"):
+                num_params = param.ds_numel
+
+            all_param += num_params
+            if param.requires_grad:
+                trainable_params += num_params
+        print(
+            f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
+        )
+
+    def __getattr__(self, name: str):
+        """Forward missing attributes to the wrapped module."""
+        try:
+            return super().__getattr__(name)  # defer to nn.Module's logic
+        except AttributeError:
+            return getattr(self.base_model, name)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        **kwargs,
+    ):
+        return self.base_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            labels=labels,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            **kwargs,
+        )
+
+    @contextmanager
+    def disable_adapter(self):
+        """
+        Disables the adapter module.
+        """
+        try:
+            self.base_model.disable_adapter_layers()
+        finally:
+            self.base_model.enable_adapter_layers()
+
+    def get_base_model(self):
+        """
+        Returns the base model.
+        """
+        return self.base_model.model
+
+    def add_adapter(self, adapter_name, peft_config):
+        if peft_config.peft_type != self.peft_type:
+            raise ValueError(
+                f"Cannot combine adapters with different peft types. "
+                f"Found {self.peft_type} and {peft_config.peft_type}."
+            )
+        self.peft_config[adapter_name] = peft_config
+        self.base_model.add_adapter(adapter_name, peft_config)
+        self.set_additional_trainable_modules(peft_config, adapter_name)
+
+    def set_additional_trainable_modules(self, peft_config, adapter_name):
+        if getattr(peft_config, "modules_to_save", None) is not None:
+            if self.modules_to_save is None:
+                self.modules_to_save = set(peft_config.modules_to_save)
+            else:
+                self.modules_to_save.update(peft_config.modules_to_save)
+            _set_trainable(self, adapter_name)
+            
+    def generate(self, **kwargs):
+        peft_config = self.active_peft_config
+        self.base_model.prepare_inputs_for_generation = self.prepare_inputs_for_generation
+        if hasattr(self.base_model, "model"):
+            self.base_model.model.generation_config = self.generation_config
+        else:
+            self.base_model.generation_config = self.generation_config
+        try:
+            outputs = self.base_model.generate(**kwargs)
+        except:
+            self.base_model.prepare_inputs_for_generation = self.base_model_prepare_inputs_for_generation
+            raise
+        else:
+            self.base_model.prepare_inputs_for_generation = self.base_model_prepare_inputs_for_generation
+            return outputs
+
+    def prepare_inputs_for_generation(self, *args, **kwargs):
+        peft_config = self.active_peft_config
+        model_kwargs = self.base_model_prepare_inputs_for_generation(*args, **kwargs)
+        if model_kwargs["past_key_values"] is None:
+            inputs_embeds = self.word_embeddings(model_kwargs["input_ids"])
+            prompts = self.get_prompt(batch_size=model_kwargs["input_ids"].shape[0])
+            prompts = prompts.to(inputs_embeds.dtype)
+            model_kwargs["inputs_embeds"] = torch.cat((prompts, inputs_embeds), dim=1)
+            model_kwargs["input_ids"] = None
+
+        return model_kwargs
+    
+    @property
+    def active_peft_config(self):
+        return self.peft_config[self.active_adapter]
+
+class Linear8bitLt(bnb.nn.Linear8bitLt, LoraLayer):
+        # Lora implemented in a dense layer
+        def __init__(
+            self,
+            adapter_name,
+            in_features,
+            out_features,
+            r: int = 0,
+            lora_alpha: int = 1,
+            lora_dropout: float = 0.0,
+            **kwargs,
+        ):
+            bnb.nn.Linear8bitLt.__init__(
+                self,
+                in_features,
+                out_features,
+                bias=kwargs.get("bias", True),
+                has_fp16_weights=kwargs.get("has_fp16_weights", True),
+                memory_efficient_backward=kwargs.get("memory_efficient_backward", False),
+                threshold=kwargs.get("threshold", 0.0),
+                index=kwargs.get("index", None),
+            )
+            LoraLayer.__init__(self, in_features=in_features, out_features=out_features)
+
+            # Freezing the pre-trained weight matrix
+            self.weight.requires_grad = False
+            init_lora_weights = kwargs.pop("init_lora_weights", True)
+            self.update_layer(adapter_name, r, lora_alpha, lora_dropout, init_lora_weights)
+            self.active_adapter = adapter_name
+
+        def forward(self, x: torch.Tensor):
+            result = super().forward(x)
+
+            if self.disable_adapters or self.active_adapter not in self.lora_A.keys():
+                return result
+            elif self.r[self.active_adapter] > 0:
+                if not torch.is_autocast_enabled():
+                    expected_dtype = result.dtype
+
+                    if x.dtype != torch.float32:
+                        x = x.float()
+                    output = (
+                        self.lora_B[self.active_adapter](
+                            self.lora_A[self.active_adapter](self.lora_dropout[self.active_adapter](x))
+                        ).to(expected_dtype)
+                        * self.scaling[self.active_adapter]
+                    )
+                else:
+                    output = (
+                        self.lora_B[self.active_adapter](
+                            self.lora_A[self.active_adapter](self.lora_dropout[self.active_adapter](x))
+                        )
+                        * self.scaling[self.active_adapter]
+                    )
+                result += output
+            return result
+
+class ModulesToSaveWrapper(torch.nn.Module):
+    def __init__(self, module_to_save, adapter_name):
+        super().__init__()
+        self.original_module = module_to_save
+        self.modules_to_save = torch.nn.ModuleDict({})
+        self.update(adapter_name)
+        self.active_adapter = adapter_name
+
+    def update(self, adapter_name):
+        self.modules_to_save.update(torch.nn.ModuleDict({adapter_name: copy.deepcopy(self.original_module)}))
+
+    def forward(self, *args, **kwargs):
+        if self.active_adapter not in self.modules_to_save:
+            return self.original_module(*args, **kwargs)
+        return self.modules_to_save[self.active_adapter](*args, **kwargs)
+
+def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
+    for n, p in model.named_parameters():
+        if "lora_" not in n:
+            p.requires_grad = False
+    if bias == "none":
+        return
+    elif bias == "all":
+        for n, p in model.named_parameters():
+            if "bias" in n:
+                p.requires_grad = True
+    elif bias == "lora_only":
+        for m in model.modules():
+            if isinstance(m, LoraLayer) and hasattr(m, "bias") and m.bias is not None:
+                m.bias.requires_grad = True
+    else:
+        raise NotImplementedError
+
+def _freeze_adapter(model, adapter_name):
+    for n, p in model.named_parameters():
+        if adapter_name in n:
+            p.requires_grad = False
+            
+def _get_submodules(model, key):
+    parent = model.get_submodule(".".join(key.split(".")[:-1]))
+    target_name = key.split(".")[-1]
+    target = model.get_submodule(key)
+    return parent, target, target_name
+
+def is_bnb_available():
+    return importlib.util.find_spec("bitsandbytes") is not None
+
+def transpose(weight, fan_in_fan_out):
+    return weight.T if fan_in_fan_out else weight
+
+def _set_trainable(model, adapter_name):
+    key_list = [key for key, _ in model.named_modules()]
+    for key in key_list:
+        target_module_found = any(key.endswith(target_key) for target_key in model.modules_to_save)
+        if target_module_found:
+            parent, target, target_name = _get_submodules(model, key)
+            if isinstance(target, ModulesToSaveWrapper):
+                target.update(adapter_name)
+            else:
+                for param in target.parameters():
+                    param.requires_grad = True
+                setattr(parent, target_name, ModulesToSaveWrapper(target, adapter_name))
+
+TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING = {
+    "t5": ["q", "v"],
+    "mt5": ["q", "v"],
+    "bart": ["q_proj", "v_proj"],
+    "gpt2": ["c_attn"],
+    "bloom": ["query_key_value"],
+    "blip-2": ["q", "v", "q_proj", "v_proj"],
+    "opt": ["q_proj", "v_proj"],
+    "gptj": ["q_proj", "v_proj"],
+    "gpt_neox": ["query_key_value"],
+    "gpt_neo": ["q_proj", "v_proj"],
+    "bert": ["query", "value"],
+    "roberta": ["query", "value"],
+    "xlm-roberta": ["query", "value"],
+    "electra": ["query", "value"],
+    "deberta-v2": ["query_proj", "value_proj"],
+    "deberta": ["in_proj"],
+    "layoutlm": ["query", "value"],
+    "llama": ["q_proj", "v_proj"],
+    "chatglm": ["query_key_value"],
+}

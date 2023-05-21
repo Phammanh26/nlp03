@@ -16,7 +16,7 @@ from accelerate import Accelerator
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader, SequentialSampler
 
-
+from lora_model import LoraModelForCasualLM
 from utils.common import download_from_driver
 from utils.logger_utils import get_logger
 from prepare_dataset import create_datasets
@@ -217,7 +217,7 @@ def load_pretrained_model():
         bias="none",
         task_type="CAUSAL_LM",
     )
-    model = get_peft_model(model, lora_config)
+    model = LoraModelForCasualLM(model, lora_config)
     model.print_trainable_parameters()
     return model
 
