@@ -57,7 +57,7 @@ class Trainer:
         # move model to device
         model.to(f"cuda:{self.gpu_id}")
 
-        mixed_precision_dtype = torch.float16
+        mixed_precision_dtype = None
         self.ctx = nullcontext() if mixed_precision_dtype == None else torch.cuda.amp.autocast(dtype=mixed_precision_dtype)
 
         
