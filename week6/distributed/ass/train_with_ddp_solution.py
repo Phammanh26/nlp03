@@ -19,7 +19,7 @@ from inference import generate_inference
 
 import warnings
 warnings.filterwarnings('ignore')
-torch.manual_seed(0)
+torch.manual_seed(42)
 torch.backends.cudnn.deterministic = True
 
 class Trainer:
@@ -90,7 +90,7 @@ class Trainer:
             loss = outputs.loss
         loss.backward()
         self.optimizer.step()
-        # torch.cuda.empty_cache()
+        torch.cuda.empty_cache()
         return loss.item()
 
     def _run_epoch(self, train_dataloader, epoch):
@@ -255,15 +255,17 @@ def load_pretrained_model(local_rank):
         task_type="CAUSAL_LM",
     )
     model = LoraModelForCasualLM(model, lora_config)
+    # model = get_peft_model(model, lora_config) # Uncomment this line to use PEFT library instead of your implementation in `lora_layer.py`.
     if _is_master_process():
         model.print_trainable_parameters()
+
     return model
 
 
 if __name__ == "__main__":
     OUTPUT_DIR = "checkpoints/"
     DRIVER_DATA_PATH = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
-    
+
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     if os.environ.get("DEBUG"):

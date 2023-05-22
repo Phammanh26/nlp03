@@ -19,7 +19,8 @@ from inference import generate_inference
 
 import warnings
 warnings.filterwarnings('ignore')
-
+torch.manual_seed(42)
+torch.backends.cudnn.deterministic = True
 
 class Trainer:
     def __init__( self,
@@ -87,7 +88,7 @@ class Trainer:
             loss = outputs.loss
         loss.backward()
         self.optimizer.step()
-       
+        torch.cuda.empty_cache()
         return loss.item()
 
     def _run_epoch(self, train_dataloader, epoch):
@@ -115,7 +116,6 @@ class Trainer:
             loss = self._run_batch(batch)
             epoch_loss += loss 
         epoch_loss /= len(train_dataloader)
-        torch.cuda.empty_cache()
         return epoch_loss
     
     def _save_checkpoint(self, epoch):
@@ -247,7 +247,7 @@ def load_pretrained_model(local_rank):
     # model = get_peft_model(model, lora_config) # Uncomment this line to use PEFT library instead of your implementation in `lora_layer.py`.
     if _is_master_process():
         model.print_trainable_parameters()
-    
+
     return model
 
 
@@ -268,7 +268,7 @@ if __name__ == "__main__":
 
     learning_rate = 1e-5
     lr_scheduler_type = 'cosine'
-    num_warmup_steps = 100
+    num_warmup_steps = 1000
     weight_decay = 0.06
 
     seed = 0
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     
 
     # TODO: Choose strategy
-    distributed_strategy = "None" # "ddp" or "None"
+    distributed_strategy = "no" # "ddp" or "no"
     
     if distributed_strategy  == "ddp":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
@@ -293,7 +293,7 @@ if __name__ == "__main__":
     else:
         os.environ['RANK'] = '0'
         local_rank = 0
-   
+
     # Prepare model
     model = load_pretrained_model(local_rank)
     # Get tokenizer
