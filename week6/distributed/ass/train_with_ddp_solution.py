@@ -31,7 +31,8 @@ class Trainer:
                 output_dir: str = 'checkpoints/',  
                 num_epochs: int = 10, 
                 max_length: int = 128, 
-                batch_size: int = 8 ):
+                batch_size: int = 8,
+                gradient_accumulation_steps: int = 16):
         """
         Initialize the Trainer class.
 
@@ -44,7 +45,7 @@ class Trainer:
             gpu_id: GPU ID for training.
         """
         
-        
+
         self.num_epochs = num_epochs
         self.max_length = max_length
         self.batch_size = batch_size
@@ -54,6 +55,7 @@ class Trainer:
         
         self.model = model  
         self.gpu_id = gpu_id
+        self.gradient_accumulation_steps = gradient_accumulation_steps
 
         # move model to device
         model.to(f"cuda:{self.gpu_id}")
@@ -84,13 +86,10 @@ class Trainer:
             Loss value for the batch.
         """
         
-        self.optimizer.zero_grad()
         with self.ctx:
             outputs = self.model(**batch) 
-            loss = outputs.loss
+            loss = outputs.loss / self.gradient_accumulation_steps  # Normalize loss
         loss.backward()
-        self.optimizer.step()
-        torch.cuda.empty_cache()
         return loss.item()
 
     def _run_epoch(self, train_dataloader, epoch):
@@ -113,10 +112,22 @@ class Trainer:
         else:
             train_progress_bar = train_dataloader
         
+        # Add counter for gradient accumulation
+        steps = 0
+        self.optimizer.zero_grad()  # Reset gradients at the beginning of each epoch
         for step, batch in enumerate(tqdm(train_progress_bar)):
             batch = {key: value.to(self.gpu_id) for key, value in batch.items()}
             loss = self._run_batch(batch)
             epoch_loss += loss 
+
+            # Increment steps
+            steps += 1
+
+            # Perform optimizer step and reset gradients after accumulating enough gradients
+            if steps % self.gradient_accumulation_steps == 0:
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                torch.cuda.empty_cache()
         epoch_loss /= len(train_dataloader)
         return epoch_loss
     
@@ -275,6 +286,7 @@ if __name__ == "__main__":
     max_length = 512
     num_epochs = 10
     batch_size = 8
+    gradient_accumulation_steps = 16
 
     learning_rate = 1e-5
     lr_scheduler_type = 'cosine'
@@ -317,7 +329,9 @@ if __name__ == "__main__":
         gpu_id=local_rank,
         tokenizer=tokenizer,
         output_dir= OUTPUT_DIR,
-        is_ddp_training = True if distributed_strategy == "ddp" else False)
+        is_ddp_training = True if distributed_strategy == "ddp" else False,
+        gradient_accumulation_steps = gradient_accumulation_steps,
+    )
     
     # set ddp for wraping model
     # execute trainer 
