@@ -23,14 +23,14 @@ warnings.filterwarnings('ignore')
 
 class Trainer:
     def __init__( self,
-            model, 
-            tokenizer, 
-            gpu_id: int, 
-            is_ddp_training: bool = True, 
-            output_dir: str = 'checkpoints/',  
-            num_epochs: int = 10, 
-            max_length: int = 128, 
-            batch_size: int = 8 ):
+                model, 
+                tokenizer, 
+                gpu_id: int, 
+                is_ddp_training: bool = True, 
+                output_dir: str = 'checkpoints/',  
+                num_epochs: int = 10, 
+                max_length: int = 128, 
+                batch_size: int = 8 ):
         """
         Initialize the Trainer class.
 
@@ -104,7 +104,6 @@ class Trainer:
         
         epoch_loss = 0
         self.model.train()
-        torch.cuda.empty_cache()
         
         if _is_master_process():
             train_progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1} [Training]", position=0, leave=False)
@@ -116,7 +115,7 @@ class Trainer:
             loss = self._run_batch(batch)
             epoch_loss += loss 
         epoch_loss /= len(train_dataloader)
-        
+        torch.cuda.empty_cache()
         return epoch_loss
     
     def _save_checkpoint(self, epoch):

@@ -1,6 +1,6 @@
 import os
 import torch
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
@@ -105,6 +105,7 @@ class Trainer:
         """
         
         epoch_loss = 0
+        torch.cuda.empty_cache()
         self.model.train()
         
         if _is_master_process():
@@ -117,7 +118,6 @@ class Trainer:
             loss = self._run_batch(batch)
             epoch_loss += loss 
         epoch_loss /= len(train_dataloader)
-        torch.cuda.empty_cache()
         return epoch_loss
     
     def _save_checkpoint(self, epoch):
