@@ -263,13 +263,12 @@ def load_pretrained_model():
 
 
 if __name__ == "__main__":
-    DEBUG = False
     OUTPUT_DIR = "checkpoints/"
     DRIVER_DATA_PATH = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
 
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
-    if DEBUG:
+    if os.environ.get("DEBUG"):
         data_path = "test_data.json"
     else:
         data_path = 'alpaca_data.json'
@@ -288,7 +287,7 @@ if __name__ == "__main__":
     eval_freq = 150
     
 
-    if DEBUG == False:
+    if not os.environ.get("DEBUG"):
         # Download data
         download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
     
@@ -300,7 +299,8 @@ if __name__ == "__main__":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
         # After that, you should set the 'local_rank' from the environment variable 'LOCAL_RANK'.
         init_process_group(backend=backend)
-        local_rank =  int(os.environ["LOCAL_RANK"])
+        local_rank = int(os.environ["LOCAL_RANK"])
+        torch.cuda.set_device(local_rank)
    
     # Prepare model
     model = load_pretrained_model()
