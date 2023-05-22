@@ -140,9 +140,9 @@ class Trainer:
 
         # save checkpoints
         if self.is_ddp_training and _is_master_process():
-            torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
-        else:
-            torch.save(self.model.state_dict(), f'{path_dir}/model.pt')
+            # save checkpoints
+            self.model.module.save_pretrained(f'epoch_{epoch}_checkpoint')
+    
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
         # TODO: Prepare the training DataLoader. Initialize 'DataLoader' with 'train_dataset' 
