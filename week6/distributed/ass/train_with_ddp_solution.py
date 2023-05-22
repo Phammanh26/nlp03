@@ -12,7 +12,7 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader, SequentialSampler
 from contextlib import nullcontext
 
-from lora_model import LoraModelForCasualLM
+from lora_model_solution import LoraModelForCasualLM
 from utils.common import download_from_driver
 from prepare_data import create_datasets
 from inference import generate_inference
