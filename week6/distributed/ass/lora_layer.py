@@ -301,13 +301,6 @@ class Linear(nn.Linear, LoraLayer):
             # Changing data type for ensuring consistency
             x = x.to(self.lora_A[self.active_adapter].weight.dtype)
             # Applying LoRA dropout, LoRA 'A' and 'B' transformations and adding the result to the original output
-            result += (
-                self.lora_B[self.active_adapter](
-                    self.lora_A[self.active_adapter](self.lora_dropout[self.active_adapter](x))
-                )
-                * self.scaling[self.active_adapter]
-            )
-
             # TODO: If the LoRA adapter is active and not merged, add the output of the LoRA layers to the result. This involves
             # passing the input through lora_A, applying dropout, then passing it through lora_B. The output is scaled by the
             # LoRA scaling factor and added to the result.
