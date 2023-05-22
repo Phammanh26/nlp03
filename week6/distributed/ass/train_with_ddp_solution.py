@@ -253,8 +253,8 @@ def load_pretrained_model(local_rank):
         bias="none",
         task_type="CAUSAL_LM",
     )
-    # model = LoraModelForCasualLM(model, lora_config)
-    model = get_peft_model(model, lora_config) # Uncomment this line to use PEFT library instead of your implementation in `lora_layer.py`.
+    model = LoraModelForCasualLM(model, lora_config)
+    # model = get_peft_model(model, lora_config) # Uncomment this line to use PEFT library instead of your implementation in `lora_layer.py`.
     if _is_master_process():
         model.print_trainable_parameters()
 
