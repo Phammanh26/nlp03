@@ -89,7 +89,7 @@ class Trainer:
             loss = outputs.loss
         loss.backward()
         self.optimizer.step()
-       
+        torch.cuda.empty_cache()
         return loss.item()
 
     def _run_epoch(self, train_dataloader, epoch):
@@ -105,7 +105,6 @@ class Trainer:
         """
         
         epoch_loss = 0
-        torch.cuda.empty_cache()
         self.model.train()
         
         if _is_master_process():
