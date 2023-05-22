@@ -57,17 +57,20 @@ class Trainer:
         # move model to device
         model.to(f"cuda:{self.gpu_id}")
 
-        # TODO: Setup mixed precision training context. If 'mixed_precision_dtype' is None, use 'nullcontext', 
-        # otherwise use 'torch.amp.autocast' with the specified dtype.
-        mixed_precision_dtype = None ### YOUR CODE HERE ###
-        self.ctx = nullcontext() ### YOUR CODE HERE ###
+        mixed_precision_dtype = torch.float16
+        self.ctx = nullcontext() if mixed_precision_dtype == None else torch.cuda.amp.autocast(dtype=mixed_precision_dtype)
+
         
 
     def _set_ddp_training(self):
         # TODO: Initialize the DistributedDataParallel wrapper for the model. 
         # You would need to pass the model and specify the device IDs
         # and output device for the data parallelism.
-        self.model = None ### YOUR CODE HERE ###
+        self.model = DDP(
+            self.model,
+            device_ids=[self.gpu_id], 
+            output_device=self.gpu_id
+            )
 
     def _is_master_process(self):
         if self.is_ddp_training:
@@ -143,14 +146,23 @@ class Trainer:
         # Depending on whether the training is distributed (is_ddp_training), 
         # use 'DistributedSampler' for 'sampler' argument, else use 'None'.
         # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors type.
-        
-        data_trainloader = None ### YOUR CODE HERE ###
+        # data_trainloader = ...
+        data_trainloader = DataLoader(
+            train_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            sampler=DistributedSampler(train_dataset, rank=self.gpu_id) if self.is_ddp_training else None,
+            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True))
 
         # TODO: Prepare the evaluation DataLoader. Initialize 'DataLoader' with 'eval_dataset', 
         # the appropriate 'batch_size', and 'SequentialSampler' for 'sampler'.
         # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors type.
-        
-        data_testloader = None ### YOUR CODE HERE ###
+        # data_testloader = ...
+        data_testloader = DataLoader(
+            eval_dataset,
+            batch_size=self.batch_size,
+            sampler=SequentialSampler(eval_dataset),
+            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt",padding=True))
         
         return data_trainloader, data_testloader
     
@@ -232,22 +244,23 @@ def load_tokenizer_from_pretrained_model(model_path):
     return tokenizer
 
 def load_pretrained_model():
-    # TODO: Load a pretrained AutoModelForCausalLM from the 'model_path'. 
-    # Make sure to set 'device_map' to 'auto'.
+    # TODO : Load the pretrained model from the model_path
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        device_map="auto",
+    )
 
-    model = None ### YOUR CODE HERE ###
-
-    # TODO: Create a LoraConfig with the parameters: r=16, lora_alpha=32, 
-    # lora_dropout=0.05, bias="none", task_type="CAUSAL_LM".
-    # We will then use the config to initialize a LoraModelForCasualLM with the loaded model. 
-    # Then, print the trainable parameters of the model.
-
-    lora_config = None ### YOUR CODE HERE ###
-    
+    lora_config = LoraConfig(
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
     model = LoraModelForCasualLM(model, lora_config)
     model.print_trainable_parameters()
-    
     return model
+
 
 if __name__ == "__main__":
     DEBUG = False
@@ -262,7 +275,7 @@ if __name__ == "__main__":
         data_path = 'alpaca_data.json'
     size_valid_set = 0.1
     max_length = 512
-    num_epochs = 3
+    num_epochs = 10
     batch_size = 8
 
     learning_rate = 1e-5
@@ -281,14 +294,13 @@ if __name__ == "__main__":
     
 
     # TODO: Choose strategy
-    distributed_strategy = "None" # "ddp" or "None"
+    distributed_strategy = "ddp" # "ddp" or "None"
     
     if distributed_strategy  == "ddp":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
         # After that, you should set the 'local_rank' from the environment variable 'LOCAL_RANK'.
-        local_rank = None ### YOUR CODE HERE ###
-    else:
-        local_rank = 0
+        init_process_group(backend=backend)
+        local_rank =  int(os.environ["LOCAL_RANK"])
    
     # Prepare model
     model = load_pretrained_model()

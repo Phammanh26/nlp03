@@ -256,6 +256,9 @@ class Linear(nn.Linear, LoraLayer):
             warnings.warn("Already merged. Nothing to do.")
             return
         if self.r[self.active_adapter] > 0:
+            # TODO: Merge the LoRA parameters by adding the product of lora_B weights and lora_A weights (after transposing 
+            # if necessary) to the original weights, scaled by the LoRA scaling factor. After this operation, set the merged
+            # flag to True.
             self.weight.data += (
                 transpose(
                     self.lora_B[self.active_adapter].weight @ self.lora_A[self.active_adapter].weight,
@@ -264,12 +267,6 @@ class Linear(nn.Linear, LoraLayer):
                 * self.scaling[self.active_adapter]
             )
             self.merged = True
-
-            # TODO: Merge the LoRA parameters by adding the product of lora_B weights and lora_A weights (after transposing 
-            # if necessary) to the original weights, scaled by the LoRA scaling factor. After this operation, set the merged
-            # flag to True.
-            self.weight.data += None ### YOUR CODE HERE ###
-            self.merged = None ### YOUR CODE HERE ###
 
     def unmerge(self):
         # Separate low-rank approximation from original weights
@@ -301,18 +298,16 @@ class Linear(nn.Linear, LoraLayer):
             # Changing data type for ensuring consistency
             x = x.to(self.lora_A[self.active_adapter].weight.dtype)
             # Applying LoRA dropout, LoRA 'A' and 'B' transformations and adding the result to the original output
+            
+            # TODO: If the LoRA adapter is active and not merged, add the output of the LoRA layers to the result. This involves
+            # passing the input through lora_A, applying dropout, then passing it through lora_B. The output is scaled by the
+            # LoRA scaling factor and added to the result.
             result += (
                 self.lora_B[self.active_adapter](
                     self.lora_A[self.active_adapter](self.lora_dropout[self.active_adapter](x))
                 )
                 * self.scaling[self.active_adapter]
             )
-
-            # TODO: If the LoRA adapter is active and not merged, add the output of the LoRA layers to the result. This involves
-            # passing the input through lora_A, applying dropout, then passing it through lora_B. The output is scaled by the
-            # LoRA scaling factor and added to the result.
-            x = x.to(self.lora_A[self.active_adapter].weight.dtype)
-            result += None ### YOUR CODE HERE ###
         else:
             result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
         

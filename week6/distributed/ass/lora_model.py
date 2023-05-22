@@ -27,6 +27,7 @@ from accelerate.hooks import AlignDevicesHook, add_hook_to_module, remove_hook_f
 import bitsandbytes as bnb
 
 from lora_layer import LoraLayer, Embedding, Linear
+from lora_layer_solution import LoraLayer, Embedding, Linear
 
 class LoraModel(torch.nn.Module):
 
