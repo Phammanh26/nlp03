@@ -140,8 +140,7 @@ class Trainer:
 
         # save checkpoints
         if self.is_ddp_training and _is_master_process():
-            self.model.module.save_pretrained('/model_save')
-            self.model.module.save_adapter('/model_save_adapter', 'LoRA')
+            self.model.module.save_pretrained(f'epoch_{epoch}_checkpoint')
 
             # torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
         else:
