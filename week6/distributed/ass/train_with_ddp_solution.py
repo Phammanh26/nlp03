@@ -258,8 +258,8 @@ def load_pretrained_model(local_rank):
     )
 
     lora_config = LoraConfig(
-        r=16,
-        lora_alpha=32,
+        r=8,
+        lora_alpha=16,
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",
@@ -288,9 +288,9 @@ if __name__ == "__main__":
     batch_size = 8
     gradient_accumulation_steps = 16
 
-    learning_rate = 1e-5
+    learning_rate = 3e-4
     lr_scheduler_type = 'cosine'
-    num_warmup_steps = 1000
+    num_warmup_steps = 100
     weight_decay = 0.06
 
     seed = 0
