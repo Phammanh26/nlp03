@@ -1,6 +1,6 @@
 import os
 import torch
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
@@ -57,7 +57,7 @@ class Trainer:
         # move model to device
         model.to(f"cuda:{self.gpu_id}")
 
-        mixed_precision_dtype = torch.float16
+        mixed_precision_dtype = None
         self.ctx = nullcontext() if mixed_precision_dtype == None else torch.cuda.amp.autocast(dtype=mixed_precision_dtype)
 
         
