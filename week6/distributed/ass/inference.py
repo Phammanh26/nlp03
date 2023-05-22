@@ -3,7 +3,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 import torch
 
 from peft import LoraConfig
-from lora_model_solution import LoraModelForCasualLM
+from lora_model import LoraModelForCasualLM
 
 prompter = Prompter()
  
