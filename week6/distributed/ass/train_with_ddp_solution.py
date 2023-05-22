@@ -90,7 +90,7 @@ class Trainer:
             loss = outputs.loss
         loss.backward()
         self.optimizer.step()
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
         return loss.item()
 
     def _run_epoch(self, train_dataloader, epoch):
@@ -263,7 +263,7 @@ def load_pretrained_model(local_rank):
 if __name__ == "__main__":
     OUTPUT_DIR = "checkpoints/"
     DRIVER_DATA_PATH = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
-
+    
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     if os.environ.get("DEBUG"):
@@ -292,7 +292,7 @@ if __name__ == "__main__":
 
     # TODO: Choose strategy
     distributed_strategy = "None" # "ddp" or "None"
-    
+    distributed_strategy = "ddp"
     if distributed_strategy  == "ddp":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
         # After that, you should set the 'local_rank' from the environment variable 'LOCAL_RANK'.
