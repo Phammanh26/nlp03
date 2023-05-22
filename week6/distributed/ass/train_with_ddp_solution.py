@@ -277,7 +277,7 @@ if __name__ == "__main__":
 
     learning_rate = 1e-5
     lr_scheduler_type = 'cosine'
-    num_warmup_steps = 100
+    num_warmup_steps = 1000
     weight_decay = 0.06
 
     seed = 0
