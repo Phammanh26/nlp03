@@ -71,13 +71,6 @@ class Trainer:
             device_ids=[self.gpu_id], 
             output_device=self.gpu_id
             )
-
-    def _is_master_process(self):
-        if self.is_ddp_training:
-            ddp_rank = int(os.environ['RANK'])
-        else:
-            ddp_rank = 0
-        return ddp_rank == 0
         
     def _run_batch(self, batch):
         """
@@ -114,7 +107,7 @@ class Trainer:
         epoch_loss = 0
         self.model.train()
         
-        if self._is_master_process():
+        if _is_master_process():
             train_progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1} [Training]", position=0, leave=False)
         else:
             train_progress_bar = train_dataloader
@@ -135,7 +128,7 @@ class Trainer:
             os.makedirs(path_dir)
 
         # save checkpoints
-        if self.is_ddp_training:
+        if self.is_ddp_training and _is_master_process():
             torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
         else:
             torch.save(self.model.state_dict(), f'{path_dir}/model.pt')
@@ -169,7 +162,7 @@ class Trainer:
     def _eval(self, eval_dataloader, epoch: int):
         avg_loss = 0
         model.eval()
-        if self._is_master_process():
+        if _is_master_process():
             eval_progress_bar = tqdm(eval_dataloader, desc=f"Epoch {epoch + 1} [Evaluation]", position=0, leave=False)
         else:
             eval_progress_bar = eval_dataloader
@@ -213,7 +206,7 @@ class Trainer:
             
             train_loss = self._run_epoch(train_dataloader, epoch)
             
-            if self._is_master_process():
+            if _is_master_process():
                 eval_loss = self._eval(eval_dataloader = eval_dataloader, epoch = epoch)
                 
                 print(f"epoch = {epoch} | avg_train_loss = {train_loss} | eval_loss = {eval_loss}")
@@ -221,15 +214,15 @@ class Trainer:
 
 
 def load_tokenizer_from_pretrained_model(model_path):
-    print('Loading config....')
     config = AutoConfig.from_pretrained(model_path)
     architecture = config.architectures[0]
-    print('Loading tokenizer.....')
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    print('Completed to load config & tokenizer')
+    if _is_master_process():
+        print('Completed to load config & tokenizer')
 
     if "Llama" in architecture:
-        print("Setting EOS, BOS, UNK, and PAD tokens for LLama tokenizer")
+        if _is_master_process():
+            print("Setting EOS, BOS, UNK, and PAD tokens for LLama tokenizer")
         tokenizer.add_special_tokens(
             {
                 "eos_token": "</s>",
@@ -243,11 +236,15 @@ def load_tokenizer_from_pretrained_model(model_path):
     
     return tokenizer
 
-def load_pretrained_model():
+def _is_master_process():
+    ddp_rank = int(os.environ['RANK'])
+    return ddp_rank == 0
+
+def load_pretrained_model(local_rank):
     # TODO : Load the pretrained model from the model_path
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
-        device_map="auto",
+        device_map={"": torch.device(f"cuda:{local_rank}")},
     )
 
     lora_config = LoraConfig(
@@ -258,7 +255,8 @@ def load_pretrained_model():
         task_type="CAUSAL_LM",
     )
     model = LoraModelForCasualLM(model, lora_config)
-    model.print_trainable_parameters()
+    if _is_master_process():
+        model.print_trainable_parameters()
     return model
 
 
@@ -300,10 +298,12 @@ if __name__ == "__main__":
         # After that, you should set the 'local_rank' from the environment variable 'LOCAL_RANK'.
         init_process_group(backend=backend)
         local_rank = int(os.environ["LOCAL_RANK"])
-        torch.cuda.set_device(local_rank)
-   
+    else:
+        os.environ['RANK'] = '0'
+        local_rank = 0
+
     # Prepare model
-    model = load_pretrained_model()
+    model = load_pretrained_model(local_rank)
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
 
@@ -326,7 +326,7 @@ if __name__ == "__main__":
         seed =seed
     )
 
-    if strategy  == "ddp":
+    if distributed_strategy  == "ddp":
         destroy_process_group()
 
 
