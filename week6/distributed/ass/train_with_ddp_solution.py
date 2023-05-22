@@ -1,6 +1,6 @@
 import os
 import torch
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
@@ -244,10 +244,8 @@ def load_pretrained_model(local_rank):
     # TODO : Load the pretrained model from the model_path
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
-        load_in_8bit=True,
         device_map={"": torch.device(f"cuda:{local_rank}")},
     )
-    model = prepare_model_for_int8_training(model)
 
     lora_config = LoraConfig(
         r=16,
@@ -275,7 +273,7 @@ if __name__ == "__main__":
     size_valid_set = 0.1
     max_length = 512
     num_epochs = 10
-    batch_size = 2
+    batch_size = 4
 
     learning_rate = 1e-5
     lr_scheduler_type = 'cosine'
