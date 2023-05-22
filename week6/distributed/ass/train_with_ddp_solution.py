@@ -1,6 +1,6 @@
 import os
 import torch
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
