@@ -1,9 +1,10 @@
 from prompt import Prompter
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 import torch
 
-prompter = Prompter()
+from peft import LoraConfig
+from lora_model_solution import LoraModelForCasualLM
 
-from prompt import Prompter
 prompter = Prompter()
  
 def tokenize( tokenizer, prompt, max_length, add_eos_token=True):
@@ -40,14 +41,13 @@ def generate_inference(
         max_length: int = 128,  
         max_new_tokens: int = 64):
     
-    device = 'cuda:1'
+    device = 'cuda'
     model.to(device)
 
     if sample == {}:
         sample = {
             "instruction": "Describe what would happen if a person jumps off a cliff",
             "input": "No input",
-            "output": "If a person jumps off a cliff, they could suffer severe injuries or even death due to the fall. Depending on the height of the cliff, they could experience a free fall of several seconds before hitting the ground. If they do not jump far enough away from the cliff, they could also hit the rocks and cause serious injuries."
         }
 
     token_encoded = generate_and_tokenize_prompt(
@@ -66,3 +66,23 @@ def generate_inference(
     
     response = tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
     print(f"\nresponse: {response}")
+
+if __name__ == '__main__':
+    model_path = 'bigscience/bloom-560m'
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        torch_dtype=torch.float16,
+    )
+
+    lora_config = LoraConfig(
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+
+    model = LoraModelForCasualLM(model, lora_config)
+    model.load_state_dict(torch.load('checkpoints/epoch_9/model.pt'))
+    generate_inference(model, tokenizer)
