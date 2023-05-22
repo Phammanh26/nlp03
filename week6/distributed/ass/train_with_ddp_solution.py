@@ -128,7 +128,7 @@ class Trainer:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 torch.cuda.empty_cache()
-        epoch_loss /= len(train_dataloader)
+        epoch_loss /= (len(train_dataloader) / self.gradient_accumulation_steps)
         return epoch_loss
     
     def _save_checkpoint(self, epoch):
