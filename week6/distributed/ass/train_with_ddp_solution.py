@@ -19,6 +19,8 @@ from inference import generate_inference
 
 import warnings
 warnings.filterwarnings('ignore')
+torch.manual_seed(42)
+torch.backends.cudnn.deterministic = True
 
 class Trainer:
     def __init__( self,
@@ -69,7 +71,7 @@ class Trainer:
             self.model,
             device_ids=[self.gpu_id], 
             output_device=self.gpu_id
-            )
+        )
         
     def _run_batch(self, batch):
         """
@@ -132,16 +134,15 @@ class Trainer:
             torch.save(self.model.state_dict(), f'{path_dir}/model.pt')
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
-        # TODO: Prepare the training DataLoader. Initialize 'DataLoader' with 'train_dataset', 
-        # the appropriate 'batch_size', and 'shuffle' set to False.
+        # TODO: Prepare the training DataLoader. Initialize 'DataLoader' with 'train_dataset' 
+        # and the appropriate 'batch_size'.
         # Depending on whether the training is distributed (is_ddp_training), 
         # use 'DistributedSampler' for 'sampler' argument, else use 'None'.
-        # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors type.
+        # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors="pt".
         # data_trainloader = ...
         data_trainloader = DataLoader(
             train_dataset,
             batch_size=self.batch_size,
-            shuffle=False,
             sampler=DistributedSampler(train_dataset, rank=self.gpu_id) if self.is_ddp_training else None,
             collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True))
 
@@ -252,8 +253,8 @@ def load_pretrained_model(local_rank):
         bias="none",
         task_type="CAUSAL_LM",
     )
-    model = LoraModelForCasualLM(model, lora_config)
-    # model = get_peft_model(model, lora_config) # Uncomment this line to use PEFT library instead of your implementation in `lora_layer.py`.
+    # model = LoraModelForCasualLM(model, lora_config)
+    model = get_peft_model(model, lora_config) # Uncomment this line to use PEFT library instead of your implementation in `lora_layer.py`.
     if _is_master_process():
         model.print_trainable_parameters()
 

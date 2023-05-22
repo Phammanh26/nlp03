@@ -4,12 +4,8 @@ from tqdm import tqdm
 
 
 from peft import LoraConfig, get_peft_model
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, Trainer
+from transformers import AutoConfig, AutoTokenizer
 
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.distributed import init_process_group, destroy_process_group
-from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data import DataLoader, SequentialSampler
 from contextlib import nullcontext
 
 from lora_model import LoraModelForCasualLM
@@ -132,11 +128,11 @@ class Trainer:
             torch.save(self.model.state_dict(), f'{path_dir}/model.pt')
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
-        # TODO: Prepare the training DataLoader. Initialize 'DataLoader' with 'train_dataset', 
-        # the appropriate 'batch_size', and 'shuffle' set to False.
+        # TODO: Prepare the training DataLoader. Initialize 'DataLoader' with 'train_dataset' 
+        # the appropriate 'batch_size'.
         # Depending on whether the training is distributed (is_ddp_training), 
         # use 'DistributedSampler' for 'sampler' argument, else use 'None'.
-        # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors type.
+        # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors="pt".
         
         data_trainloader = None ### YOUR CODE HERE ###
 
@@ -231,7 +227,7 @@ def _is_master_process():
 
 def load_pretrained_model(local_rank):
     # TODO: Load a pretrained AutoModelForCausalLM from the 'model_path'. 
-    # Make sure to set 'device_map' to '{"": torch.device(f"cuda:{local_rank}")}'.
+    # Make sure to set 'device_map' to '{"": torch.device(f"cuda:{local_rank}")}' for DDP training.
 
     model = None ### YOUR CODE HERE ###
 
@@ -282,7 +278,7 @@ if __name__ == "__main__":
     
 
     # TODO: Choose strategy
-    distributed_strategy = "no" # "ddp" or "no"
+    distributed_strategy = "no" ### YOUR CODE HERE ###
     
     if distributed_strategy  == "ddp":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
