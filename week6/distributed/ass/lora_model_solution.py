@@ -35,7 +35,7 @@ from accelerate.utils import get_balanced_memory
 
 import bitsandbytes as bnb
 
-from lora_layer import LoraLayer, Embedding, Linear
+from lora_layer_solution import LoraLayer, Embedding, Linear
 
 class LoraModel(torch.nn.Module):
 
