@@ -19,8 +19,6 @@ from inference import generate_inference
 
 import warnings
 warnings.filterwarnings('ignore')
-torch.manual_seed(42)
-torch.backends.cudnn.deterministic = True
 
 class Trainer:
     def __init__( self,
