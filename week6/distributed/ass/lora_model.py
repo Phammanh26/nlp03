@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import sys, os
 
 from contextlib import contextmanager
@@ -23,7 +24,15 @@ from peft import (
 
 from transformers.pytorch_utils import Conv1D
 from transformers.utils import PushToHubMixin
-from accelerate.hooks import AlignDevicesHook, add_hook_to_module, remove_hook_from_submodules
+
+from accelerate import dispatch_model, infer_auto_device_map
+from accelerate.hooks import (
+    AlignDevicesHook,
+    add_hook_to_module,
+    remove_hook_from_submodules,
+)
+from accelerate.utils import get_balanced_memory
+
 import bitsandbytes as bnb
 
 from lora_layer import LoraLayer, Embedding, Linear
@@ -329,7 +338,7 @@ class LoraModelForCasualLM(PushToHubMixin, torch.nn.Module):
 
         config.inference_mode = not is_trainable
 
-        model = LoraModel[config.task_type](model, config, adapter_name)
+        model = LoraModelForCasualLM(model, config, adapter_name)
         model.load_adapter(model_id, adapter_name, **kwargs)
         return model
 
@@ -442,6 +451,80 @@ class LoraModelForCasualLM(PushToHubMixin, torch.nn.Module):
             model_kwargs["input_ids"] = None
 
         return model_kwargs
+    
+    def load_adapter(self, model_id, adapter_name, is_trainable=False, **kwargs):
+        if adapter_name not in self.peft_config:
+            # load the config
+            peft_config = LoraConfig.from_pretrained(model_id, subfolder=kwargs.get("subfolder", None))
+            peft_config.inference_mode = not is_trainable
+            self.add_adapter(adapter_name, peft_config)
+
+        # load weights if any
+        path = os.path.join(model_id, kwargs["subfolder"]) if kwargs.get("subfolder", None) is not None else model_id
+
+        if os.path.exists(os.path.join(path, "adapter_model.bin")):
+            filename = os.path.join(path, "adapter_model.bin")
+        else:
+            raise ValueError(
+                f"Can't find weights for {model_id} in {model_id} or in the Hugging Face Hub. "
+                f"Please check that the file adapter.bin is present at {model_id}."
+            )
+
+        adapters_weights = torch.load(
+            filename, map_location=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        )
+        # load the weights into the model
+        set_peft_model_state_dict(self, adapters_weights, adapter_name=adapter_name)
+        if (
+            (getattr(self, "hf_device_map", None) is not None)
+            and (len(set(self.hf_device_map.values()).intersection({"cpu", "disk"})) > 0)
+            and len(self.peft_config) == 1
+        ):
+            device_map = kwargs.get("device_map", "auto")
+            max_memory = kwargs.get("max_memory", None)
+            offload_dir = kwargs.get("offload_folder", None)
+            offload_index = kwargs.get("offload_index", None)
+
+            dispatch_model_kwargs = {}
+            # Safety checker for previous `accelerate` versions
+            # `offload_index` was introduced in https://github.com/huggingface/accelerate/pull/873/
+            if "offload_index" in inspect.signature(dispatch_model).parameters:
+                dispatch_model_kwargs["offload_index"] = offload_index
+
+            no_split_module_classes = self._no_split_modules
+
+            if device_map != "sequential":
+                max_memory = get_balanced_memory(
+                    self,
+                    max_memory=max_memory,
+                    no_split_module_classes=no_split_module_classes,
+                    low_zero=(device_map == "balanced_low_0"),
+                )
+            if isinstance(device_map, str):
+                device_map = infer_auto_device_map(
+                    self, max_memory=max_memory, no_split_module_classes=no_split_module_classes
+                )
+            dispatch_model(
+                self,
+                device_map=device_map,
+                offload_dir=offload_dir,
+                **dispatch_model_kwargs,
+            )
+            hook = AlignDevicesHook(io_same_device=True)
+            add_hook_to_module(self.get_base_model(), hook)
+
+        # Set model in evaluation mode to deactivate Dropout modules by default
+        self.eval()
+
+    def set_adapter(self, adapter_name):
+        """
+        Sets the active adapter.
+        """
+        if adapter_name not in self.peft_config:
+            raise ValueError(f"Adapter {adapter_name} not found.")
+        self.active_adapter = adapter_name
+        self.base_model.set_adapter(adapter_name)
+        _set_adapter(self, adapter_name)
     
     @property
     def active_peft_config(self):
@@ -565,6 +648,85 @@ def _set_trainable(model, adapter_name):
                 for param in target.parameters():
                     param.requires_grad = True
                 setattr(parent, target_name, ModulesToSaveWrapper(target, adapter_name))
+
+def get_peft_model_state_dict(model, state_dict=None, adapter_name="default"):
+    config = model.peft_config[adapter_name]
+    if state_dict is None:
+        state_dict = model.state_dict()
+    if config.peft_type in ("LORA"):
+        bias = config.bias
+        if bias == "none":
+            to_return = {k: state_dict[k] for k in state_dict if "lora_" in k}
+        elif bias == "all":
+            to_return = {k: state_dict[k] for k in state_dict if "lora_" in k or "bias" in k}
+        elif bias == "lora_only":
+            to_return = {}
+            for k in state_dict:
+                if "lora_" in k:
+                    to_return[k] = state_dict[k]
+                    bias_name = k.split("lora_")[0] + "bias"
+                    if bias_name in state_dict:
+                        to_return[bias_name] = state_dict[bias_name]
+        else:
+            raise NotImplementedError
+        to_return = {k: v for k, v in to_return.items() if (("lora_" in k and adapter_name in k) or ("bias" in k))}
+    else:
+        raise NotImplementedError
+    if model.modules_to_save is not None:
+        for key, value in state_dict.items():
+            if any(f"{module_name}.modules_to_save.{adapter_name}" in key for module_name in model.modules_to_save):
+                to_return[key.replace("modules_to_save.", "")] = value
+
+    to_return = {k.replace(f".{adapter_name}", ""): v for k, v in to_return.items()}
+    return to_return
+
+
+def set_peft_model_state_dict(model, peft_model_state_dict, adapter_name="default"):
+    """
+    Set the state dict of the Peft model.
+
+    Args:
+        model ([`PeftModel`]): The Peft model.
+        peft_model_state_dict (`dict`): The state dict of the Peft model.
+    """
+    config = model.peft_config[adapter_name]
+    state_dict = {}
+    if model.modules_to_save is not None:
+        for key, value in peft_model_state_dict.items():
+            if any(module_name in key for module_name in model.modules_to_save):
+                for module_name in model.modules_to_save:
+                    if module_name in key:
+                        key = key.replace(module_name, f"{module_name}.modules_to_save.{adapter_name}")
+                        break
+            state_dict[key] = value
+    else:
+        state_dict = peft_model_state_dict
+
+    if config.peft_type in ("LORA"):
+        peft_model_state_dict = {}
+        for k, v in state_dict.items():
+            if "lora_" in k:
+                suffix = k.split("lora_")[1]
+                if "." in suffix:
+                    suffix_to_replace = ".".join(suffix.split(".")[1:])
+                    k = k.replace(suffix_to_replace, f"{adapter_name}.{suffix_to_replace}")
+                else:
+                    k = f"{k}.{adapter_name}"
+                peft_model_state_dict[k] = v
+            else:
+                peft_model_state_dict[k] = v
+    else:
+        raise NotImplementedError
+
+    model.load_state_dict(peft_model_state_dict, strict=False)
+    
+
+def _set_adapter(model, adapter_name):
+    for module in model.modules():
+        if isinstance(module, ModulesToSaveWrapper):
+            module.active_adapter = adapter_name
+            
+            
 
 TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING = {
     "t5": ["q", "v"],
