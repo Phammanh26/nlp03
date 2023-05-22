@@ -291,8 +291,8 @@ if __name__ == "__main__":
     
 
     # TODO: Choose strategy
-    distributed_strategy = "None" # "ddp" or "None"
-    distributed_strategy = "ddp"
+    distributed_strategy = "no" # "ddp" or "no"
+
     if distributed_strategy  == "ddp":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
         # After that, you should set the 'local_rank' from the environment variable 'LOCAL_RANK'.
