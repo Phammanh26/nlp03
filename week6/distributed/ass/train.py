@@ -19,8 +19,7 @@ from inference import generate_inference
 
 import warnings
 warnings.filterwarnings('ignore')
-torch.manual_seed(0)
-torch.backends.cudnn.deterministic = True
+
 
 class Trainer:
     def __init__( self,
@@ -58,20 +57,18 @@ class Trainer:
         # move model to device
         model.to(f"cuda:{self.gpu_id}")
 
-        mixed_precision_dtype = torch.float16
-        self.ctx = nullcontext() if mixed_precision_dtype == None else torch.cuda.amp.autocast(dtype=mixed_precision_dtype)
-
+        # TODO: Setup mixed precision training context. If 'mixed_precision_dtype' is None, use 'nullcontext', 
+        # otherwise use 'torch.amp.autocast' with the specified dtype.
+        mixed_precision_dtype = None ### YOUR CODE HERE ###
+        self.ctx = nullcontext() ### YOUR CODE HERE ###
         
 
     def _set_ddp_training(self):
         # TODO: Initialize the DistributedDataParallel wrapper for the model. 
         # You would need to pass the model and specify the device IDs
         # and output device for the data parallelism.
-        self.model = DDP(
-            self.model,
-            device_ids=[self.gpu_id], 
-            output_device=self.gpu_id
-            )
+        self.model = None ### YOUR CODE HERE ###
+
         
     def _run_batch(self, batch):
         """
@@ -90,7 +87,7 @@ class Trainer:
             loss = outputs.loss
         loss.backward()
         self.optimizer.step()
-        torch.cuda.empty_cache()
+       
         return loss.item()
 
     def _run_epoch(self, train_dataloader, epoch):
@@ -118,6 +115,7 @@ class Trainer:
             loss = self._run_batch(batch)
             epoch_loss += loss 
         epoch_loss /= len(train_dataloader)
+        torch.cuda.empty_cache()
         return epoch_loss
     
     def _save_checkpoint(self, epoch):
@@ -139,23 +137,14 @@ class Trainer:
         # Depending on whether the training is distributed (is_ddp_training), 
         # use 'DistributedSampler' for 'sampler' argument, else use 'None'.
         # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors type.
-        # data_trainloader = ...
-        data_trainloader = DataLoader(
-            train_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            sampler=DistributedSampler(train_dataset, rank=self.gpu_id) if self.is_ddp_training else None,
-            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True))
+        
+        data_trainloader = None ### YOUR CODE HERE ###
 
         # TODO: Prepare the evaluation DataLoader. Initialize 'DataLoader' with 'eval_dataset', 
         # the appropriate 'batch_size', and 'SequentialSampler' for 'sampler'.
         # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors type.
-        # data_testloader = ...
-        data_testloader = DataLoader(
-            eval_dataset,
-            batch_size=self.batch_size,
-            sampler=SequentialSampler(eval_dataset),
-            collate_fn=DataCollatorForSeq2Seq(self.tokenizer, pad_to_multiple_of=8, return_tensors="pt",padding=True))
+        
+        data_testloader = None ### YOUR CODE HERE ###
         
         return data_trainloader, data_testloader
     
@@ -241,22 +230,24 @@ def _is_master_process():
     return ddp_rank == 0
 
 def load_pretrained_model(local_rank):
-    # TODO : Load the pretrained model from the model_path
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        device_map={"": torch.device(f"cuda:{local_rank}")},
-    )
+    # TODO: Load a pretrained AutoModelForCausalLM from the 'model_path'. 
+    # Make sure to set 'device_map' to '{"": torch.device(f"cuda:{local_rank}")}'.
 
-    lora_config = LoraConfig(
-        r=16,
-        lora_alpha=32,
-        lora_dropout=0.05,
-        bias="none",
-        task_type="CAUSAL_LM",
-    )
+    model = None ### YOUR CODE HERE ###
+
+    # TODO: Create a LoraConfig with the parameters: r=16, lora_alpha=32, 
+    # lora_dropout=0.05, bias="none", task_type="CAUSAL_LM".
+    # We will then use the config to initialize a LoraModelForCasualLM with the loaded model. 
+    # Then, print the trainable parameters of the model.
+
+    lora_config = None ### YOUR CODE HERE ###
+
+    # Create PEFT model
     model = LoraModelForCasualLM(model, lora_config)
+    # model = get_peft_model(model, lora_config) # Uncomment this line to use PEFT library instead of your implementation in `lora_layer.py`.
     if _is_master_process():
         model.print_trainable_parameters()
+    
     return model
 
 
@@ -277,7 +268,7 @@ if __name__ == "__main__":
 
     learning_rate = 1e-5
     lr_scheduler_type = 'cosine'
-    num_warmup_steps = 1000
+    num_warmup_steps = 100
     weight_decay = 0.06
 
     seed = 0
@@ -296,12 +287,13 @@ if __name__ == "__main__":
     if distributed_strategy  == "ddp":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
         # After that, you should set the 'local_rank' from the environment variable 'LOCAL_RANK'.
-        init_process_group(backend=backend)
-        local_rank = int(os.environ["LOCAL_RANK"])
+        
+        # Initialize the process group ### YOUR CODE HERE ###
+        local_rank = None ### YOUR CODE HERE ###
     else:
         os.environ['RANK'] = '0'
         local_rank = 0
-
+   
     # Prepare model
     model = load_pretrained_model(local_rank)
     # Get tokenizer
