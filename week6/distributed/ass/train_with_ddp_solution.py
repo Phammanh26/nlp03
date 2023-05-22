@@ -15,7 +15,6 @@ from contextlib import nullcontext
 from lora_model_solution import LoraModelForCasualLM
 from utils.common import download_from_driver
 from prepare_data import create_datasets
-from inference import generate_inference
 
 import warnings
 warnings.filterwarnings('ignore')
