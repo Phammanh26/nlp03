@@ -115,10 +115,12 @@ class Trainer:
         steps = 0
         self.optimizer.zero_grad()  # Reset gradients at the beginning of each epoch
         for step, batch in enumerate(train_progress_bar):
+            torch.cuda.empty_cache()
             batch = {key: value.to(self.gpu_id) for key, value in batch.items()}
             loss = self._run_batch(batch)
+            
             epoch_loss += loss 
-
+            
             # Increment steps
             steps += 1
 
