@@ -278,7 +278,7 @@ if __name__ == "__main__":
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     
-    if os.environ.get("DEBUG") or os.environ.get("DEBUG") == '1':
+    if os.environ.get("DEBUG") or os.environ.get("DEBUG") == '0':
         data_path = 'alpaca_data.json'
     else:
         data_path = "test_data.json"
@@ -299,7 +299,7 @@ if __name__ == "__main__":
     log_freq = 1
     eval_freq = 150
 
-    if not os.environ.get("DEBUG") and  os.environ.get("DEBUG") != '0':
+    if not os.environ.get("DEBUG") and  os.environ.get("DEBUG") == '0':
         # Download data
         download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
     
