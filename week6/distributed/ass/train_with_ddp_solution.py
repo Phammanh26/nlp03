@@ -114,7 +114,7 @@ class Trainer:
         # Add counter for gradient accumulation
         steps = 0
         self.optimizer.zero_grad()  # Reset gradients at the beginning of each epoch
-        for step, batch in enumerate(tqdm(train_progress_bar)):
+        for step, batch in enumerate(train_progress_bar):
             batch = {key: value.to(self.gpu_id) for key, value in batch.items()}
             loss = self._run_batch(batch)
             epoch_loss += loss 
