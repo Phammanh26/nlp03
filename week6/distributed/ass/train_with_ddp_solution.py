@@ -257,6 +257,7 @@ def load_pretrained_model(local_rank):
     # TODO : Load the pretrained model from the model_path
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
+        torch_dtype=torch.float16,
         device_map={"": torch.device(f"cuda:{local_rank}")},
     )
 
@@ -296,7 +297,7 @@ if __name__ == "__main__":
     size_valid_set = 0.1
     max_length = 512
     num_epochs = 10
-    batch_size = 8
+    batch_size = 1
     gradient_accumulation_steps = 16
 
     learning_rate = 3e-4
