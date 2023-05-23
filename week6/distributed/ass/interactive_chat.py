@@ -2,11 +2,10 @@ import argparse
 import json
 
 import torch
-import transformers
 from transformers import GenerationConfig, AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
 from lora_model import LoraModelForCasualLM
-from utils import Prompter
+from prompt import Prompter
 
 def get_response(prompt, tokenizer, model, generation_config, max_new_tokens):
     inputs = tokenizer(prompt, return_tensors="pt")
