@@ -11,7 +11,8 @@ from contextlib import nullcontext
 from lora_model import LoraModelForCasualLM
 from utils.common import download_from_driver
 from prepare_data import create_datasets
-from inference import generate_inference
+from torch.distributed import  destroy_process_group
+
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -330,9 +331,6 @@ if __name__ == "__main__":
 
     if distributed_strategy  == "ddp":
         destroy_process_group()
-
-
-
 
 
 
