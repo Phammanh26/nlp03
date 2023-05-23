@@ -280,7 +280,7 @@ if __name__ == "__main__":
     DRIVER_DATA_PATH = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
 
     backend = "nccl"
-    model_path = 'bigscience/bloom-560m'
+    model_path = 'bigscience/bloom-1b7'
     
     # print(f'DEBUG = {os.environ.get("DEBUG")}')
     
@@ -296,7 +296,7 @@ if __name__ == "__main__":
     size_valid_set = 0.1
     max_length = 512
     num_epochs = 10
-    batch_size = 4
+    batch_size = 8
     gradient_accumulation_steps = 16
 
     learning_rate = 3e-4
