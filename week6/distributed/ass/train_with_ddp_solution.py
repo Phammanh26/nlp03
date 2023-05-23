@@ -205,6 +205,7 @@ class Trainer:
         train_dataloader, eval_dataloader = self.prepare_dataloader(train_dataset, eval_dataset)
         
         if self.is_ddp_training:
+            print(f"Setup DDP training.....")
             self._set_ddp_training()
 
         # Setup the optimizer

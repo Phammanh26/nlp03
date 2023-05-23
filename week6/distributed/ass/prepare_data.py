@@ -40,6 +40,8 @@ def create_datasets(data_path, size_valid_set, tokenizer, max_length, seed):
         return tokenized_full_prompt
     
     prompter = Prompter()
+
+    print(f"Load dataset....")
     dataset = load_dataset('json', split='train', data_files=data_path)
     dataset = dataset.train_test_split(test_size=size_valid_set, seed=seed)
 
