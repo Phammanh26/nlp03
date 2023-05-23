@@ -278,10 +278,11 @@ if __name__ == "__main__":
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     
-    if os.environ.get("DEBUG") or os.environ.get("DEBUG") == '0':
-        data_path = "test_data.json"
-    else:
+    if os.environ.get("DEBUG") or os.environ.get("DEBUG") == '1':
         data_path = 'alpaca_data.json'
+    else:
+        data_path = "test_data.json"
+        
     
     size_valid_set = 0.1
     max_length = 512
