@@ -278,10 +278,13 @@ if __name__ == "__main__":
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     
-    print(f'DEBUG = {os.environ.get("DEBUG")}')
+    # print(f'DEBUG = {os.environ.get("DEBUG")}')
     
-    if os.environ.get("DEBUG") == '0':
+    if os.environ.get("DEBUG") and int(os.environ.get("DEBUG")) == 0:
         data_path = 'alpaca_data.json'
+        # Download data
+        download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
+        
     else:
         data_path = "test_data.json"
         
@@ -300,12 +303,7 @@ if __name__ == "__main__":
     seed = 0
     log_freq = 1
     eval_freq = 150
-
-    if not os.environ.get("DEBUG") and  os.environ.get("DEBUG") == '0':
-        # Download data
-        download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
-    
-
+        
     # TODO: Choose strategy
     distributed_strategy = "ddp" # "ddp" or "no"
 
