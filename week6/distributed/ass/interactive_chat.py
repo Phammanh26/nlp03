@@ -48,6 +48,9 @@ def main():
             0  # unk. we want this to be different from the eos token
         )
         tokenizer.padding_side = "left"
+    elif "GPTNeo" in architecture:
+        tokenizer.pad_token_id = 0 # unk. we want this to be different from the eos token
+        tokenizer.padding_side = "left"  # Allow batched inference
     
     model = AutoModelForCausalLM.from_pretrained(
             args.model_path,
