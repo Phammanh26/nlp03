@@ -73,7 +73,7 @@ def main():
     prompter = Prompter()
     
     while True:
-        instruction = input("instruction")
+        instruction = "write story about new house"
         user_inp =  "n/a"
         # instruction = input("Your Instruction: ")
         # user_inp = input("Your input (enter n/a if there is no): ")
