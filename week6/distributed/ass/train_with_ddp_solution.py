@@ -212,7 +212,7 @@ class Trainer:
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         
         for epoch in range(self.num_epochs):
-            
+            print(f"Start training.....: {epoch}")
             if self.is_ddp_training:
                 train_dataloader.sampler.set_epoch(epoch)
             
