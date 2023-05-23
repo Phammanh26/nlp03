@@ -246,6 +246,9 @@ def load_tokenizer_from_pretrained_model(model_path):
         tokenizer.pad_token_id = (
             0  # unk. we want this to be different from the eos token
         )
+    elif "GPTNeo" in architecture:
+        tokenizer.pad_token_id = 0 # unk. we want this to be different from the eos token
+        tokenizer.padding_side = "left"  # Allow batched inference
     
     return tokenizer
 
@@ -278,15 +281,15 @@ def load_pretrained_model(local_rank):
 
 if __name__ == "__main__":
     OUTPUT_DIR = "checkpoints/"
-    DRIVER_DATA_PATH = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
+    DRIVER_DATA_PATH = 'https://drive.google.com/file/d/1dvFe-qa1KDDwxFrvCF5eJIEh0glz__l8/view?usp=sharing'
 
     backend = "nccl"
-    model_path = 'bigscience/bloom-1b7'
+    model_path = 'VietAI/gpt-neo-1.3B-vietnamese-news'
     
     print(f'DEBUG = {os.environ.get("DEBUG")}')
     
     if os.environ.get("DEBUG") and int(os.environ.get("DEBUG")) == 0:
-        data_path = 'alpaca_data.json'
+        data_path = 'vi_alpaca_data.json'
         # Download data
         download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
         
