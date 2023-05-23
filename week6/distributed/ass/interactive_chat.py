@@ -73,8 +73,10 @@ def main():
     prompter = Prompter()
     
     while True:
-        instruction = input("Your Instruction: ")
-        user_inp = input("Your input (enter n/a if there is no): ")
+        instruction = "Write a creative story about an adventure to an abandoned house"
+        user_inp =  None
+        # instruction = input("Your Instruction: ")
+        # user_inp = input("Your input (enter n/a if there is no): ")
         if user_inp.lower().strip() == "n/a":
             user_inp = None
         prompt = prompter.generate_prompt(instruction, user_inp)
