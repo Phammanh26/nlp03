@@ -278,7 +278,7 @@ if __name__ == "__main__":
     backend = "nccl"
     model_path = 'bigscience/bloom-560m'
     
-    if os.environ.get("DEBUG") or os.environ.get("DEBUG") == '0':
+    if os.environ.get("DEBUG") == '0':
         data_path = 'alpaca_data.json'
     else:
         data_path = "test_data.json"
