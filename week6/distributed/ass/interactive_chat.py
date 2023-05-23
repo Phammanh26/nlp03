@@ -74,7 +74,7 @@ def main():
     
     while True:
         instruction = "Write a creative story about an adventure to an abandoned house"
-        user_inp =  None
+        user_inp =  "n/a"
         # instruction = input("Your Instruction: ")
         # user_inp = input("Your input (enter n/a if there is no): ")
         if user_inp.lower().strip() == "n/a":
