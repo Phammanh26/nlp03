@@ -1,7 +1,7 @@
 import os
 import torch
 from tqdm import tqdm
-
+import wandb
 
 from peft import LoraConfig
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, Trainer
@@ -32,7 +32,8 @@ class Trainer:
                 max_length: int = 128, 
                 batch_size: int = 8,
                 mixed_precision_dtype = None,
-                gradient_accumulation_steps: int = 16):
+                gradient_accumulation_steps: int = 16,
+                wandb_config =  None):
         """
         Initialize the Trainer class.
 
@@ -57,13 +58,16 @@ class Trainer:
         self.gpu_id = gpu_id
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self.mixed_precision_dtype = mixed_precision_dtype
+        self.wandb_config = wandb_config
         # move model to device
         model.to(f"cuda:{self.gpu_id}")
 
         # set mixed precision context
         self.set_mixed_precision_context(mixed_precision_dtype)
         
-        
+            
+
+
     def set_mixed_precision_context(self, mixed_precision_dtype):
         # Setup mixed precision training context
         if self.mixed_precision_dtype==torch.float16:
@@ -99,12 +103,13 @@ class Trainer:
         with self.ctx:
             outputs = self.model(**batch) 
             loss = outputs.loss / self.gradient_accumulation_steps  # Normalize loss
+        loss_val = loss.item()
         
         if self.mixed_precision_dtype==torch.float16:
             self.gradscaler.scale(loss).backward()
         else:
             loss.backward()
-        return loss.item()
+        return loss_val
 
     def _run_epoch(self, train_dataloader, epoch):
         """
@@ -142,9 +147,11 @@ class Trainer:
             # Perform optimizer step and reset gradients after accumulating enough gradients
             if steps % self.gradient_accumulation_steps == 0:
                 
-                # TODO: If 'mixed_precision_dtype' is torch.float16, you have to modify the gradient update step using the gradscaler.
+                #If 'mixed_precision_dtype' is torch.float16, you have to modify the gradient update step using the gradscaler.
                 if self.mixed_precision_dtype==torch.float16:
+                    # TODO: optimizer step
                     self.gradscaler.step(self.optimizer)
+                    # TODO: update scaler factor 
                     self.gradscaler.update()
                 else:
                     self.optimizer.step()
@@ -154,7 +161,7 @@ class Trainer:
         epoch_loss /= (len(train_dataloader) / self.gradient_accumulation_steps)
         return epoch_loss
     
-    def _save_checkpoint(self, epoch):
+    def _save_checkpoint(self, epoch, run_wandb):
         path_dir = f"{self.output_dir}/epoch_{epoch}"
         
         # check path_dir exited
@@ -163,8 +170,13 @@ class Trainer:
 
         # save checkpoints
         if self.is_ddp_training and _is_master_process():
-            # save checkpoints
+            # save checkpoints to local
             self.model.module.save_pretrained(f'epoch_{epoch}_checkpoint')
+            
+            # save checkpoints to wandb
+            if self.wandb_config:
+                run_wandb.save(f'epoch_{epoch}_checkpoint/*')
+                
     
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
@@ -234,6 +246,11 @@ class Trainer:
         # Setup the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         
+        run_wandb = None
+        if self.wandb_config:
+            project_name = self.wandb_config["project_name"] if "project_name" in  self.wandb_config else "vietai-llm-practice"
+            run_wandb = wandb.init(project=project_name)
+        
         for epoch in range(self.num_epochs):
             print(f"Start training.....: {epoch}")
             if self.is_ddp_training:
@@ -245,7 +262,7 @@ class Trainer:
                 eval_loss = self._eval(eval_dataloader = eval_dataloader, epoch = epoch)
                 
                 print(f"epoch = {epoch} | avg_train_loss = {train_loss} | eval_loss = {eval_loss}")
-                self._save_checkpoint(epoch = epoch)
+                self._save_checkpoint(epoch = epoch, run_wandb = run_wandb)
 
 
 def load_tokenizer_from_pretrained_model(model_path):
@@ -361,6 +378,7 @@ if __name__ == "__main__":
         output_dir= OUTPUT_DIR,
         is_ddp_training = True if distributed_strategy == "ddp" else False,
         gradient_accumulation_steps = gradient_accumulation_steps,
+        wandb_config={"project_name": "vietai-llm-practice"}
     )
     
     # set ddp for wraping model
@@ -373,10 +391,3 @@ if __name__ == "__main__":
 
     if distributed_strategy  == "ddp":
         destroy_process_group()
-
-
-
-
-
-
-
