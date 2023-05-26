@@ -56,7 +56,7 @@ class Trainer:
         self.model = model  
         self.gpu_id = gpu_id
         self.gradient_accumulation_steps = gradient_accumulation_steps
-
+        self.mixed_precision_dtype = mixed_precision_dtype
         # move model to device
         model.to(f"cuda:{self.gpu_id}")
 
@@ -331,7 +331,7 @@ if __name__ == "__main__":
     distributed_strategy = "ddp" # "ddp" or "no"
 
     # TODO: confg mixed_precision_dtype
-    mixed_precision_dtype = None
+    mixed_precision_dtype = torch.float16
 
     if distributed_strategy  == "ddp":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
