@@ -31,6 +31,7 @@ class Trainer:
                 num_epochs: int = 10, 
                 max_length: int = 128, 
                 batch_size: int = 8,
+                mixed_precision_dtype = None,
                 gradient_accumulation_steps: int = 16):
         """
         Initialize the Trainer class.
@@ -59,10 +60,20 @@ class Trainer:
         # move model to device
         model.to(f"cuda:{self.gpu_id}")
 
-        mixed_precision_dtype = torch.float16
-        self.ctx = nullcontext() if mixed_precision_dtype == None else torch.cuda.amp.autocast(dtype=mixed_precision_dtype)
 
+        # set mixed precision context
+        self.set_mixed_precision_context(mixed_precision_dtype)
         
+        
+    def set_mixed_precision_context(self, mixed_precision_dtype):
+        # TODO: Setup mixed precision training context
+        if mixed_precision_dtype is None:
+            # If 'mixed_precision_dtype' is None, use 'nullcontext', 
+            self.ctx = nullcontext()
+        else:
+            # TODO Otherwise, use 'torch.amp.autocast' context with the specified dtype, and initialize GradScaler if mixed_precision_dtype is float16.
+            self.ctx = torch.cuda.amp.autocast(dtype=mixed_precision_dtype)
+            self.gradscaler = torch.cuda.amp.GradScaler()
 
     def _set_ddp_training(self):
         # TODO: Initialize the DistributedDataParallel wrapper for the model. 
@@ -126,7 +137,14 @@ class Trainer:
 
             # Perform optimizer step and reset gradients after accumulating enough gradients
             if steps % self.gradient_accumulation_steps == 0:
-                self.optimizer.step()
+                
+                # TODO: If 'mixed_precision_dtype' is torch.float16, you have to modify the gradient update step using the gradscaler.
+                if self.mixed_precision_dtype==torch.float16:
+                    self.gradscaler.step(self.optimizer)
+                    self.gradscaler.update()
+                else:
+                    self.optimizer.step()
+                
                 self.optimizer.zero_grad()
                 torch.cuda.empty_cache()
         epoch_loss /= (len(train_dataloader) / self.gradient_accumulation_steps)
@@ -253,7 +271,7 @@ def _is_master_process():
     ddp_rank = int(os.environ['RANK'])
     return ddp_rank == 0
 
-def load_pretrained_model(local_rank):
+def load_pretrained_model(local_rank, model_path):
     # TODO : Load the pretrained model from the model_path
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
@@ -312,6 +330,9 @@ if __name__ == "__main__":
     # TODO: Choose strategy
     distributed_strategy = "ddp" # "ddp" or "no"
 
+    # TODO: confg mixed_precision_dtype
+    mixed_precision_dtype = None
+
     if distributed_strategy  == "ddp":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
         # After that, you should set the 'local_rank' from the environment variable 'LOCAL_RANK'.
@@ -322,7 +343,7 @@ if __name__ == "__main__":
         local_rank = 0
 
     # Prepare model
-    model = load_pretrained_model(local_rank)
+    model = load_pretrained_model(local_rank, model_path)
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
 
@@ -332,6 +353,7 @@ if __name__ == "__main__":
         num_epochs = num_epochs,
         max_length = max_length,
         batch_size = batch_size,
+        mixed_precision_dtype = mixed_precision_dtype,
         gpu_id=local_rank,
         tokenizer=tokenizer,
         output_dir= OUTPUT_DIR,
