@@ -60,7 +60,6 @@ class Trainer:
         # move model to device
         model.to(f"cuda:{self.gpu_id}")
 
-
         # set mixed precision context
         self.set_mixed_precision_context(mixed_precision_dtype)
         
@@ -100,7 +99,11 @@ class Trainer:
         with self.ctx:
             outputs = self.model(**batch) 
             loss = outputs.loss / self.gradient_accumulation_steps  # Normalize loss
-        loss.backward()
+        
+        if self.mixed_precision_dtype==torch.float16:
+            self.gradscaler.scale(loss).backward()
+        else:
+            loss.backward()
         return loss.item()
 
     def _run_epoch(self, train_dataloader, epoch):
@@ -301,8 +304,6 @@ if __name__ == "__main__":
 
     backend = "nccl"
     model_path = 'bigscience/bloom-1b7'
-    
-    print(f'DEBUG = {os.environ.get("DEBUG")}')
     
     if os.environ.get("DEBUG") and int(os.environ.get("DEBUG")) == 0:
         data_path = 'alpaca_data.json'
