@@ -241,7 +241,7 @@ class Trainer:
         if self.is_ddp_training:
             print(f"Setup DDP training.....")
             self._set_ddp_training()
-            print(f"Completed training!!!")
+            print(f"Completed Setup DDP training!!!")
 
         # Setup the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
