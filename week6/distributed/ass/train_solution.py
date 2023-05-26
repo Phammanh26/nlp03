@@ -66,14 +66,15 @@ class Trainer:
         
         
     def set_mixed_precision_context(self, mixed_precision_dtype):
-        # TODO: Setup mixed precision training context
-        if mixed_precision_dtype is None:
-            # If 'mixed_precision_dtype' is None, use 'nullcontext', 
-            self.ctx = nullcontext()
-        else:
-            # TODO Otherwise, use 'torch.amp.autocast' context with the specified dtype, and initialize GradScaler if mixed_precision_dtype is float16.
+        # Setup mixed precision training context
+        if self.mixed_precision_dtype==torch.float16:
+            # TODO  use 'torch.amp.autocast' context with the specified dtype, and initialize GradScaler if mixed_precision_dtype is float16.
             self.ctx = torch.cuda.amp.autocast(dtype=mixed_precision_dtype)
             self.gradscaler = torch.cuda.amp.GradScaler()
+        else:
+            # Otherwise, use 'nullcontext', 
+            self.ctx = nullcontext()
+           
 
     def _set_ddp_training(self):
         # TODO: Initialize the DistributedDataParallel wrapper for the model. 
