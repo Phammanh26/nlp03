@@ -1,7 +1,6 @@
 import os
 import torch
 from tqdm import tqdm
-import wandb
 
 from peft import LoraConfig
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, Trainer
@@ -32,8 +31,7 @@ class Trainer:
                 max_length: int = 128, 
                 batch_size: int = 8,
                 mixed_precision_dtype = None,
-                gradient_accumulation_steps: int = 16
-                ):
+                gradient_accumulation_steps: int = 16):
         """
         Initialize the Trainer class.
 
@@ -104,6 +102,7 @@ class Trainer:
             loss = outputs.loss / self.gradient_accumulation_steps  # Normalize loss
         loss_val = loss.item()
         
+        # TODO: If 'mixed_precision_dtype' is torch.float16, you have to modify the backward using the gradscaler.
         if self.mixed_precision_dtype==torch.float16:
             self.gradscaler.scale(loss).backward()
         else:
@@ -232,14 +231,10 @@ class Trainer:
         train_dataloader, eval_dataloader = self.prepare_dataloader(train_dataset, eval_dataset)
         
         if self.is_ddp_training:
-            print(f"Setup DDP training.....")
             self._set_ddp_training()
-            print(f"Completed training!!!")
 
         # Setup the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
-        
-    
         
         for epoch in range(self.num_epochs):
             if self.is_ddp_training:
@@ -290,6 +285,12 @@ def load_pretrained_model(local_rank, model_path: str = ""):
         device_map={"": torch.device(f"cuda:{local_rank}")},
     )
 
+    # TODO: Create a LoraConfig with the parameters: r=8, lora_alpha=16, 
+    # lora_dropout=0.05, bias="none", task_type="CAUSAL_LM".
+    # We will then use the config to initialize a LoraModelForCasualLM with the loaded model. 
+    # Then, print the trainable parameters of the model.
+
+    # Create LoRA model
     lora_config = LoraConfig(
         r=8,
         lora_alpha=16,
@@ -316,7 +317,7 @@ if __name__ == "__main__":
         data_path = 'test_data.json'
         
     else:
-        data_path = "alpaca_data.json"
+        data_path = 'alpaca_data.json'
         download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
 
         
@@ -339,9 +340,6 @@ if __name__ == "__main__":
     # TODO: Choose strategy
     distributed_strategy = "ddp" # "ddp" or "no"
 
-    # TODO: confg mixed_precision_dtype
-    mixed_precision_dtype = torch.float16
-
     if distributed_strategy  == "ddp":
         # TODO: Initialize the process group for distributed data parallelism with nccl backend.
         # After that, you should set the 'local_rank' from the environment variable 'LOCAL_RANK'.
@@ -352,7 +350,7 @@ if __name__ == "__main__":
         local_rank = 0
 
     # Prepare model
-    model = load_pretrained_model(local_rank, model_path)
+    model = load_pretrained_model(local_rank, model_path = model_path)
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
 
@@ -362,8 +360,8 @@ if __name__ == "__main__":
         num_epochs = num_epochs,
         max_length = max_length,
         batch_size = batch_size,
-        mixed_precision_dtype = mixed_precision_dtype,
         gpu_id=local_rank,
+        mixed_precision_dtype = torch.float16, #TODO: Set the mixed precision data type, hint use float16
         tokenizer=tokenizer,
         output_dir= OUTPUT_DIR,
         is_ddp_training = True if distributed_strategy == "ddp" else False,
