@@ -32,8 +32,8 @@ class Trainer:
                 max_length: int = 128, 
                 batch_size: int = 8,
                 mixed_precision_dtype = None,
-                gradient_accumulation_steps: int = 16,
-                wandb_config =  None):
+                gradient_accumulation_steps: int = 16
+                ):
         """
         Initialize the Trainer class.
 
@@ -53,14 +53,13 @@ class Trainer:
         self.output_dir = output_dir
         self.tokenizer = tokenizer
         self.is_ddp_training = is_ddp_training
-        
-        self.model = model  
         self.gpu_id = gpu_id
+        self.model = model.to(f"cuda:{self.gpu_id}")
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self.mixed_precision_dtype = mixed_precision_dtype
-        self.wandb_config = wandb_config
-        # move model to device
-        model.to(f"cuda:{self.gpu_id}")
+
+        self.ctx  = None
+        self.gradscaler = None
 
         # set mixed precision context
         self.set_mixed_precision_context(mixed_precision_dtype)
@@ -135,15 +134,10 @@ class Trainer:
         steps = 0
         self.optimizer.zero_grad()  # Reset gradients at the beginning of each epoch
         for step, batch in enumerate(train_progress_bar):
-            torch.cuda.empty_cache()
+            steps += 1
             batch = {key: value.to(self.gpu_id) for key, value in batch.items()}
             loss = self._run_batch(batch)
-            
             epoch_loss += loss 
-            
-            # Increment steps
-            steps += 1
-
             # Perform optimizer step and reset gradients after accumulating enough gradients
             if steps % self.gradient_accumulation_steps == 0:
                 
@@ -161,7 +155,7 @@ class Trainer:
         epoch_loss /= (len(train_dataloader) / self.gradient_accumulation_steps)
         return epoch_loss
     
-    def _save_checkpoint(self, epoch, run_wandb):
+    def _save_checkpoint(self, epoch):
         path_dir = f"{self.output_dir}/epoch_{epoch}"
         
         # check path_dir exited
@@ -172,10 +166,9 @@ class Trainer:
         if self.is_ddp_training and _is_master_process():
             # save checkpoints to local
             self.model.module.save_pretrained(f'epoch_{epoch}_checkpoint')
-            
-            # save checkpoints to wandb
-            if self.wandb_config:
-                run_wandb.save(f'epoch_{epoch}_checkpoint/*')
+        
+        else:
+            self.model.save_pretrained(f'epoch_{epoch}_checkpoint')
                 
     
 
@@ -246,13 +239,9 @@ class Trainer:
         # Setup the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         
-        run_wandb = None
-        if self.wandb_config:
-            project_name = self.wandb_config["project_name"] if "project_name" in  self.wandb_config else "vietai-llm-practice"
-            run_wandb = wandb.init(project=project_name)
+    
         
         for epoch in range(self.num_epochs):
-            print(f"Start training.....: {epoch}")
             if self.is_ddp_training:
                 train_dataloader.sampler.set_epoch(epoch)
             
@@ -262,7 +251,7 @@ class Trainer:
                 eval_loss = self._eval(eval_dataloader = eval_dataloader, epoch = epoch)
                 
                 print(f"epoch = {epoch} | avg_train_loss = {train_loss} | eval_loss = {eval_loss}")
-                self._save_checkpoint(epoch = epoch, run_wandb = run_wandb)
+                self._save_checkpoint(epoch = epoch)
 
 
 def load_tokenizer_from_pretrained_model(model_path):
@@ -292,8 +281,9 @@ def _is_master_process():
     ddp_rank = int(os.environ['RANK'])
     return ddp_rank == 0
 
-def load_pretrained_model(local_rank, model_path):
-    # TODO : Load the pretrained model from the model_path
+def load_pretrained_model(local_rank, model_path: str = ""):
+    # TODO: Load a pretrained AutoModelForCausalLM from the 'model_path' in float16 data type. 
+    # Make sure to set 'device_map' to '{"": torch.device(f"cuda:{local_rank}")}' for DDP training.
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         torch_dtype=torch.float16,
@@ -322,13 +312,13 @@ if __name__ == "__main__":
     backend = "nccl"
     model_path = 'bigscience/bloom-1b7'
     
-    if os.environ.get("DEBUG") and int(os.environ.get("DEBUG")) == 0:
-        data_path = 'alpaca_data.json'
-        # Download data
-        download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
+    if os.environ.get("DEBUG"):
+        data_path = 'test_data.json'
         
     else:
-        data_path = "test_data.json"
+        data_path = "alpaca_data.json"
+        download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
+
         
     
     size_valid_set = 0.1
@@ -377,8 +367,7 @@ if __name__ == "__main__":
         tokenizer=tokenizer,
         output_dir= OUTPUT_DIR,
         is_ddp_training = True if distributed_strategy == "ddp" else False,
-        gradient_accumulation_steps = gradient_accumulation_steps,
-        wandb_config={"project_name": "vietai-llm-practice"}
+        gradient_accumulation_steps = gradient_accumulation_steps
     )
     
     # set ddp for wraping model

@@ -144,10 +144,12 @@ class Embedding(nn.Embedding, LoraLayer):
 
     # Separate low-rank approximation from original weight
     def unmerge(self, mode: bool = True):
+        
         # If the weights are already unmerged, raise a warning
         if not self.merged:
             warnings.warn("Already unmerged. Nothing to do.")
             return
+        
         # If the rank of the active adapter is greater than 0, subtract the product of the LoRA weights
         # from the weights of the embedding
         if self.r[self.active_adapter] > 0:
@@ -255,6 +257,9 @@ class Linear(nn.Linear, LoraLayer):
         if self.merged:
             warnings.warn("Already merged. Nothing to do.")
             return
+        
+
+        # Note tại sao unmerge
         if self.r[self.active_adapter] > 0:
             self.weight.data += (
                 transpose(
