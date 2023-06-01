@@ -21,15 +21,16 @@ torch.backends.cudnn.deterministic = True
 
 class Trainer:
     def __init__( self,
-                model, 
-                tokenizer, 
-                gpu_id: int, 
-                is_ddp_training: bool = True, 
-                output_dir: str = 'checkpoints/',  
-                num_epochs: int = 10, 
-                max_length: int = 128, 
-                batch_size: int = 8,
-                gradient_accumulation_steps: int = 16):
+            model, 
+            tokenizer, 
+            gpu_id: int, 
+            is_ddp_training: bool = True, 
+            output_dir: str = 'checkpoints/',  
+            num_epochs: int = 10, 
+            max_length: int = 128, 
+            batch_size: int = 8,
+            mixed_precision_dtype =  None,
+            gradient_accumulation_steps: int = 16):
         """
         Initialize the Trainer class.
 
@@ -49,19 +50,29 @@ class Trainer:
         self.output_dir = output_dir
         self.tokenizer = tokenizer
         self.is_ddp_training = is_ddp_training
-        
-        self.model = model  
         self.gpu_id = gpu_id
-        self.gradient_accumulation_steps = gradient_accumulation_steps
-
-        # move model to device
-        model.to(f"cuda:{self.gpu_id}")
-
-        # TODO: Setup mixed precision training context. If 'mixed_precision_dtype' is None, use 'nullcontext', 
-        # otherwise use 'torch.amp.autocast' with the specified dtype.
-        mixed_precision_dtype = None ### YOUR CODE HERE ###
-        self.ctx = nullcontext() ### YOUR CODE HERE ###
+        self.model = model.to(f"cuda:{self.gpu_id}")  
         
+        self.gradient_accumulation_steps = gradient_accumulation_steps
+        
+        self.mixed_precision_dtype = mixed_precision_dtype
+        self.ctx  = None
+        self.gradscaler = None
+        
+        # set mixed precision context
+        self.set_mixed_precision_context(mixed_precision_dtype)
+        
+        
+    def set_mixed_precision_context(self, mixed_precision_dtype):
+        # TODO: Setup mixed precision training context
+        if mixed_precision_dtype is None:
+            # If 'mixed_precision_dtype' is None, use 'nullcontext', 
+            self.ctx = nullcontext()
+        else:
+            # TODO Otherwise, use 'torch.amp.autocast' context with the specified dtype, and initialize GradScaler if mixed_precision_dtype is float16.
+            self.ctx = None ### YOUR CODE HERE ###
+            self.gradscaler = None ### YOUR CODE HERE ###
+            
 
     def _set_ddp_training(self):
         # TODO: Initialize the DistributedDataParallel wrapper for the model. 
@@ -81,11 +92,20 @@ class Trainer:
             Loss value for the batch.
         """
         
+       
         with self.ctx:
             outputs = self.model(**batch) 
             loss = outputs.loss / self.gradient_accumulation_steps  # Normalize loss
-        loss.backward()
-        return loss.item()
+        loss_val = loss.item()
+        
+        # TODO: If 'mixed_precision_dtype' is torch.float16, you have to modify the backward using the gradscaler.
+        if self.mixed_precision_dtype==torch.float16:
+            ### YOUR CODE HERE ###
+            pass 
+        else:
+            loss.backward()
+
+        return loss_val
 
     def _run_epoch(self, train_dataloader, epoch):
         """
@@ -110,38 +130,46 @@ class Trainer:
         # Add counter for gradient accumulation
         steps = 0
         self.optimizer.zero_grad()  # Reset gradients at the beginning of each epoch
-        for step, batch in enumerate(tqdm(train_progress_bar)):
+        for step, batch in enumerate(train_progress_bar):
+            steps += 1
             batch = {key: value.to(self.gpu_id) for key, value in batch.items()}
             loss = self._run_batch(batch)
             epoch_loss += loss 
-
-            # Increment steps
-            steps += 1
-
             # Perform optimizer step and reset gradients after accumulating enough gradients
             if steps % self.gradient_accumulation_steps == 0:
-                self.optimizer.step()
+    
+                #If 'mixed_precision_dtype' is torch.float16, you have to modify the gradient update step using the gradscaler.
+                if self.mixed_precision_dtype==torch.float16:
+                    ### YOUR CODE HERE ###
+                    # TODO: optimizer step
+                    # TODO: update scaler factor 
+                    pass 
+                else:
+                    self.optimizer.step()
                 self.optimizer.zero_grad()
+                
                 torch.cuda.empty_cache()
         epoch_loss /= (len(train_dataloader) / self.gradient_accumulation_steps)
         return epoch_loss
     
     def _save_checkpoint(self, epoch):
-        path_dir = f"{self.output_dir}/epoch_{epoch}"
+        checkpoint_path_dir = f"{self.output_dir}/epoch_{epoch}_checkpoint"
         
         # check path_dir exited
-        if not os.path.exists(path_dir):
-            os.makedirs(path_dir)
+        if not os.path.exists(checkpoint_path_dir):
+            os.makedirs(checkpoint_path_dir)
 
         # save checkpoints
         if self.is_ddp_training and _is_master_process():
-            torch.save(self.model.module.state_dict(), f'{path_dir}/model.pt')
+            # save checkpoints to local
+            self.model.module.save_pretrained(checkpoint_path_dir)
+        
         else:
-            torch.save(self.model.state_dict(), f'{path_dir}/model.pt')
+            self.model.save_pretrained(checkpoint_path_dir)
 
     def prepare_dataloader(self, train_dataset, eval_dataset):
         # TODO: Prepare the training DataLoader. Initialize 'DataLoader' with 'train_dataset' 
-        # the appropriate 'batch_size'.
+        # and the appropriate 'batch_size'.
         # Depending on whether the training is distributed (is_ddp_training), 
         # use 'DistributedSampler' for 'sampler' argument, else use 'None'.
         # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors="pt".
@@ -211,6 +239,7 @@ class Trainer:
 
 
 def load_tokenizer_from_pretrained_model(model_path):
+    
     config = AutoConfig.from_pretrained(model_path)
     architecture = config.architectures[0]
     tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -237,8 +266,8 @@ def _is_master_process():
     ddp_rank = int(os.environ['RANK'])
     return ddp_rank == 0
 
-def load_pretrained_model(local_rank):
-    # TODO: Load a pretrained AutoModelForCausalLM from the 'model_path'. 
+def load_pretrained_model(local_rank, model_path: str = ""):
+    # TODO: Load a pretrained AutoModelForCausalLM from the 'model_path' in float16 data type. 
     # Make sure to set 'device_map' to '{"": torch.device(f"cuda:{local_rank}")}' for DDP training.
 
     model = None ### YOUR CODE HERE ###
@@ -250,7 +279,7 @@ def load_pretrained_model(local_rank):
 
     lora_config = None ### YOUR CODE HERE ###
 
-    # Create PEFT model
+    # Create LoRA model
     model = LoraModelForCasualLM(model, lora_config)
     # model = get_peft_model(model, lora_config) # Uncomment this line to use PEFT library instead of your implementation in `lora_layer.py`.
     if _is_master_process():
@@ -264,11 +293,13 @@ if __name__ == "__main__":
     DRIVER_DATA_PATH = 'https://drive.google.com/file/d/1QpgvQi6mFvN5-6ofmJunDbuz34tlLbLL/view?usp=sharing'
 
     backend = "nccl"
-    model_path = 'bigscience/bloom-560m'
+    model_path = 'bigscience/bloom-1b7'
     if os.environ.get("DEBUG"):
-        data_path = "test_data.json"
+        data_path = 'test_data.json'
     else:
         data_path = 'alpaca_data.json'
+        download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
+
     size_valid_set = 0.1
     max_length = 512
     num_epochs = 10
@@ -284,12 +315,6 @@ if __name__ == "__main__":
     log_freq = 1
     eval_freq = 150
     
-
-    if not os.environ.get("DEBUG"):
-        # Download data
-        download_from_driver(path= DRIVER_DATA_PATH, location_path= data_path)
-    
-
     # TODO: Choose strategy
     distributed_strategy = "no" ### YOUR CODE HERE ###
     
@@ -304,7 +329,7 @@ if __name__ == "__main__":
         local_rank = 0
 
     # Prepare model
-    model = load_pretrained_model(local_rank)
+    model = load_pretrained_model(local_rank, model_path= model_path)
     # Get tokenizer
     tokenizer = load_tokenizer_from_pretrained_model(model_path = model_path)
 
@@ -315,10 +340,11 @@ if __name__ == "__main__":
         max_length = max_length,
         batch_size = batch_size,
         gpu_id=local_rank,
+        mixed_precision_dtype = None,  #TODO: Set the mixed precision data type, hint use float16
         tokenizer=tokenizer,
         output_dir= OUTPUT_DIR,
         is_ddp_training = True if distributed_strategy == "ddp" else False,
-        gradient_accumulation_steps = gradient_accumulation_steps,
+        gradient_accumulation_steps = gradient_accumulation_steps
     )
     
     # set ddp for wraping model
@@ -331,7 +357,3 @@ if __name__ == "__main__":
 
     if distributed_strategy  == "ddp":
         destroy_process_group()
-
-
-
-
