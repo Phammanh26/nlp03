@@ -177,7 +177,6 @@ class Trainer:
         # Depending on whether the training is distributed (is_ddp_training), 
         # use 'DistributedSampler' for 'sampler' argument, else use 'None'.
         # Use 'DataCollatorForSeq2Seq' for 'collate_fn', passing 'tokenizer', padding settings, and return_tensors="pt".
-        # data_trainloader = ...
         data_trainloader = DataLoader(
             train_dataset,
             batch_size=self.batch_size,
